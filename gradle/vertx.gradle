@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
  */
 
 apply plugin: 'java'
-apply plugin: 'groovy'
+apply plugin: 'scala'
 apply plugin: 'idea'
 apply plugin: 'eclipse'
 
