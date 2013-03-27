@@ -122,6 +122,50 @@ object Database extends VertxScalaHelpers {
     p.future
   }
 
+  def unapproved(vertx: Vertx): Future[List[Module]] = {
+    val p = Promise[List[Module]]
+    vertx.eventBus().send(dbAddress,
+      json
+        .putString("action", "find")
+        .putString("collection", "modules")
+        .putObject("sort", json.putNumber("timeRegistered", 1))
+        .putObject("matcher", json.putBoolean("approved", false)), {
+        msg: Message[JsonObject] =>
+          msg.body.getString("status") match {
+            case "ok" =>
+              import scala.collection.JavaConversions._
+              val it = msg.body.getArray("results").iterator()
+              val modules = for (m <- msg.body.getArray("results")) yield {
+                m match {
+                  case m: JsonObject => Module.fromJson(m)
+                }
+              }
+              p.success(modules.toList)
+
+            case "error" => p.failure(new DatabaseException(msg.body.getString("message")))
+          }
+      })
+
+    p.future
+  }
+
+  def approve(vertx: Vertx, id: String) = {
+    val p = Promise[JsonObject]
+    vertx.eventBus().send(dbAddress,
+      json
+        .putString("action", "update")
+        .putString("collection", "modules")
+        .putObject("criteria", json.putString("_id", id))
+        .putObject("objNew", json.putObject("$set", json.putBoolean("approved", true))), {
+        msg: Message[JsonObject] =>
+          msg.body.getString("status") match {
+            case "ok" => p.success(msg.body)
+            case "error" => p.failure(new DatabaseException(msg.body.getString("message")))
+          }
+      })
+    p.future
+  }
+
   def registerModule(vertx: Vertx, module: Module) = {
     val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,
