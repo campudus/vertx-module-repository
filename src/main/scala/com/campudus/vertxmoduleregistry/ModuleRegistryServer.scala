@@ -50,10 +50,49 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
             modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
             req.response.end(json.putArray("modules", modulesArray).encode)
           case Failure(error) =>
-            req.response.end("Error occuring while listing last approved modules: " + error.getMessage())
+            req.response.end("Error occured while listing last approved modules: " + error.getMessage())
         }
       //        case _ => 
       //      }
+    })
+
+    rm.get("/unapproved", {
+      req: HttpServerRequest =>
+        unapproved(vertx).onComplete {
+          case Success(modules) =>
+            val modulesArray = new JsonArray()
+            modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
+            req.response.end(json.putArray("modules", modulesArray).encode)
+          case Failure(error) =>
+            req.response.end("Error occured while listing unapproved modules: " + error.getMessage())
+        }
+    })
+
+    rm.post("/approve", {
+      req: HttpServerRequest =>
+        req.dataHandler({ buf: Buffer =>
+          implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+          implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+          val id = getRequiredParam("_id", "Module ID required")
+
+          val errors = errorBuffer.result
+          if (errors.isEmpty) {
+            approve(vertx, id).onComplete {
+              case Success(json) =>
+                req.response.end("Successfully approved module: " + id)
+              case Failure(error) =>
+                req.response.end("Error occured while approving module: " + error.getMessage())
+            }
+          } else {
+            req.response.setChunked(true)
+            req.response.putHeader("Content-type", "text/html")
+
+            req.response.write("<p>Errors occured while approving module:</p>\n")
+            req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
+            req.response.end("<p>Please re-submit.</p>")
+          }
+        })
     })
 
     rm.post("/search", { req: HttpServerRequest =>
@@ -71,17 +110,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
               modules.map(_.toJson.encode()).foreach(m => req.response.write(m.toString()))
               req.response.end
             case Failure(error) =>
-              req.response.end("Error occuring while searching for modules: " + error.getMessage())
+              req.response.end("Error occured while searching for modules: " + error.getMessage())
           }
+        } else {
+          //
         }
-        //        else {
-        //          req.response.setChunked(true)
-        //          req.response.putHeader("Content-type", "text/html")
-        //
-        //          req.response.write("<p>Errors occuring while searching for modules:</p>\n")
-        //          req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
-        //          req.response.end("<p>Please try again.</p>")
-        //        }
       })
     })
 
