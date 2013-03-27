@@ -14,6 +14,8 @@ import scala.util.Success
 import scala.util.Failure
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.net.URLDecoder
+import org.vertx.java.core.AsyncResult
+import org.vertx.java.core.file.FileProps
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
@@ -34,7 +36,10 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
     val rm = new RouteMatcher
 
     rm.get("/", { req: HttpServerRequest =>
-      req.response.sendFile(System.getProperty("user.dir") + "/web/index.html")
+      req.response.sendFile(getWebPath() + "/index.html")
+    })
+    rm.get("/register", { req: HttpServerRequest =>
+      req.response.sendFile(getWebPath() + "/register.html")
     })
 
     rm.get("/last-approved-modules", {
@@ -74,14 +79,6 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
               req.response.end("Error occuring while searching for modules: " + error.getMessage())
           }
         }
-        //        else {
-        //          req.response.setChunked(true)
-        //          req.response.putHeader("Content-type", "text/html")
-        //
-        //          req.response.write("<p>Errors occuring while searching for modules:</p>\n")
-        //          req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
-        //          req.response.end("<p>Please try again.</p>")
-        //        }
       })
     })
 
@@ -127,11 +124,69 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
       })
     })
 
+    rm.getWithRegEx("^(.*)$", { implicit req: HttpServerRequest =>
+      val param0 = trimSlashes(req.params.get("param0"))
+      val param = if (param0 == "") {
+        "index.html"
+      } else {
+        param0
+      }
+      val errorDir = getWebPath() + "/errors"
+
+      if (param.contains("..")) {
+        deliver(403, errorDir + "403.html")
+      } else {
+        val path = getWebPath() + param
+
+        vertx.fileSystem().props(path, {
+          fprops: AsyncResult[FileProps] =>
+            if (fprops.succeeded()) {
+              if (fprops.result.isDirectory) {
+                val indexFile = path + "/index.html"
+                vertx.fileSystem().exists(indexFile, {
+                  exists: AsyncResult[java.lang.Boolean] =>
+                    if (exists.succeeded() && exists.result) {
+                      deliver(indexFile)
+                    } else {
+                      deliver(404, errorDir + "/404.html")
+                    }
+                })
+              } else {
+                deliver(path)
+              }
+            } else {
+              deliver(404, errorDir + "/404.html")
+            }
+        })
+      }
+    })
+
     vertx.createHttpServer().requestHandler(rm).listen(8080);
     println("started server")
   }
 
   override def stop() {
     println("stopped server")
+  }
+
+  private def getWebPath() = System.getProperty("user.dir") + "/web"
+
+  private def trimSlashes(path: String) = {
+    path.replace("^/+", "").replace("/+$", "")
+  }
+
+  private def deliver(file: String)(implicit request: HttpServerRequest): Unit = deliver(200, file)(request)
+  private def deliver(statusCode: Int, file: String)(implicit request: HttpServerRequest) {
+    println("Delivering: " + file + " with code " + statusCode)
+    request.response.statusCode = statusCode
+    request.response.sendFile(file)
+  }
+
+  private def deliverValidUrl(file: String)(implicit request: HttpServerRequest) {
+    if (file.contains("..")) {
+      deliver(403, "errors/403.html")
+    } else {
+      deliver(file)
+    }
   }
 }

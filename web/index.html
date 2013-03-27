@@ -2,48 +2,80 @@
 <html>
 <head>
 <title>Vert.x Module Registry</title>
+<link rel="stylesheet" type="text/css" href="/css/normalize.css" />
+<link rel="stylesheet" type="text/css" href="/css/main.css" />
+<script src="js/jquery.js" type="text/javascript"></script>
+<script>
+  function fillLatestApprovedModules() {
+    $.getJSON('/latest-approved-modules.json', function(data) {
+      var item, items = '<ul>', modules = data.modules;
+      while (modules.length) {
+        item = modules.pop();
+        items += '<li><span class="date">' + item.timeApproved
+            + '</span> - <a href="' + item.projectUrl + '">' + item.owner + '~' + item.name + '~'
+            + item.version + '</a></li>';
+      }
+      items += '</ul>';
+      $('#latestApprovedModules').append(items);
+    });
+  }
+
+  function createSearchFormSubmitHandler() {
+    $('#searchForm').submit(
+        function(event) {
+          event.preventDefault();
+
+          $.postJSON('/search.json', function(data) {
+            var item, items = '<ul>', modules = data.modules;
+            while (modules.length) {
+              item = modules.pop();
+              items += '<li><a href="' + item.projectUrl + '">' + item.owner + '~' + item.name
+                  + '~' + item.version + '</a></li>';
+            }
+            items += '</ul>';
+            $('#searchResults').empty();
+            $('#searchResults').append(items);
+            $('#searchResultContainer').show();
+          });
+        });
+  }
+
+  $(document).ready(function() {
+    fillLatestApprovedModules();
+    createSearchFormSubmitHandler();
+  });
+</script>
 </head>
 <body>
-	<h1>Register your module</h1>
-	<p>Please fill in the fields and submit your module. You'll need to wait for a moderator to
-		approve your module. Feel free to ping us in IRC on Freenode.</p>
-	<form action="/register" method="POST">
-		<div>
-			<label>Download URL <input type="url" name="downloadUrl" placeholder="Download URL for this module" /></label>
+	<h1>Vert.x Module Registry</h1>
+	<p>This is the Vert.x module registry. Here you can find all modules published by Vert.x users.</p>
+	<div id="search">
+		<h2>Search</h2>
+		<div id="searchForModules">
+			<form action="/search" method="post" id="searchForm">
+				<fieldset>
+					<legend>Search for modules</legend>
+					<div>
+						<input type="text" name="query" placeholder="Query for modules" />
+					</div>
+					<button type="submit">Search</button>
+				</fieldset>
+			</form>
 		</div>
-		<div>
-			<label>Name of your module (same as modname in gradle.properties) <input type="text" name="modname" placeholder="Name of your module" /></label> 
+		<div id="searchResultContainer">
+			<h2>Search results</h2>
+			<div id="searchResults"></div>
 		</div>
-		<div>
-			<label>Owner of the module (same as modowner in gradle.properties) <input type="text" name="modowner" placeholder="Owner of the module (groupId)" /></label> 
-		</div>
-		<div>
-			<label>Version of your module <input type="text" name="version" placeholder="Version of your module" /></label> 
-		</div>
-		<div>
-			<label>Supported Vert.x Version <input type="text" name="vertxVersion" placeholder="Supported Vert.x Version" /></label> 
-		</div>
-		<div>
-			<label>Short description of your module <input type="text" name="description" placeholder="Short description of your module" /></label> 
-		</div>
-		<div>
-			<label>Project URL <input type="url" name="projectUrl" placeholder="Project URL" /></label> 
-		</div>
-		<div>
-			<label>Module Author <input type="text" name="author" placeholder="Module Author" /></label> 
-		</div>
-		<div>
-			<label>E-mail of module author <input type="email" name="email" placeholder="E-mail of module author" /></label> 
-		</div>
-		<div>
-			<label>Link to your license <input type="text" name="license" placeholder="Link to your license" /></label> 
-		</div>
-		<div>
-			<label>Comma separated keywords / tags <input type="text" name="keywords" placeholder="Comma separated keywords / tags" /></label> 
-		</div>
-		<div>
-			<button type="submit">Submit for moderation</button>
-		</div>
-	</form>
+	</div>
+	<div id="stats">
+		<h2>Latest approved modules</h2>
+		<div id="latestApprovedModules"></div>
+	</div>
+	<div id="further">
+		<h2>Register your own module</h2>
+		<p>
+			To register your own module, simply fill out the <a href="/register">registration form</a>.
+		</p>
+	</div>
 </body>
 </html>

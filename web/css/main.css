@@ -1,0 +1,18 @@
+body {
+	font-family: sans-serif;
+}
+
+/* SEARCH */
+
+#search {
+	text-align: center;
+}
+#search fieldset {
+	border: 0;
+}
+#search legend {
+	display: none;
+}
+#searchResultContainer {
+	display: none;
+}
