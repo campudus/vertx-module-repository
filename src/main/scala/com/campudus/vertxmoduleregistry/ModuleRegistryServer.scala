@@ -37,15 +37,63 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
       req.response.sendFile(System.getProperty("user.dir") + "/web/index.html")
     })
 
+    rm.get("/last-approved-modules", {
+      req: HttpServerRequest =>
+        //    	  req.params().get("limit") match {
+        //        case str: String =>
+        lastApprovedModules(vertx, 5).onComplete {
+          case Success(modules) =>
+            /*
+             {modules: [{...},{...}]}
+             */
+            val modulesArray = new JsonArray()
+            modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
+            req.response.end(json.putArray("modules", modulesArray).encode)
+          case Failure(error) =>
+            req.response.end("Error occuring while listing last approved modules: " + error.getMessage())
+        }
+      //        case _ => 
+      //      }
+    })
+
+    rm.post("/search", { req: HttpServerRequest =>
+      req.dataHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val query = getRequiredParam("query", "Cannot search with empty keywords")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          searchModules(vertx, query).onComplete {
+            case Success(modules) =>
+              req.response.setChunked(true)
+              modules.map(_.toJson.encode()).foreach(m => req.response.write(m.toString()))
+              req.response.end
+            case Failure(error) =>
+              req.response.end("Error occuring while searching for modules: " + error.getMessage())
+          }
+        }
+        //        else {
+        //          req.response.setChunked(true)
+        //          req.response.putHeader("Content-type", "text/html")
+        //
+        //          req.response.write("<p>Errors occuring while searching for modules:</p>\n")
+        //          req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
+        //          req.response.end("<p>Please try again.</p>")
+        //        }
+      })
+    })
+
     rm.post("/register", { req: HttpServerRequest =>
-      val paramMap = req.dataHandler({ buf: Buffer =>
+      req.dataHandler({ buf: Buffer =>
         implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
 
         implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
         val downloadUrl = getRequiredParam("downloadUrl", "Download URL missing")
-        val modname = getRequiredParam("modname", "Missing name")
-        val modowner = getRequiredParam("modowner", "Missing owner")
+        val name = getRequiredParam("modname", "Missing name")
+        val owner = getRequiredParam("modowner", "Missing owner")
         val version = getRequiredParam("version", "Missing version of module")
         val vertxVersion = getRequiredParam("vertxVersion", "Missing vertx version")
         val description = getRequiredParam("description", "Missing description")
@@ -60,18 +108,18 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
         val errors = errorBuffer.result
         if (errors.isEmpty) {
-          val module = Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, license, keywords)
+          val module = Module(downloadUrl, name, owner, version, vertxVersion, description, projectUrl, author, email, license, keywords, System.currentTimeMillis())
           registerModule(vertx, module).onComplete {
             case Success(json) =>
               req.response.end("Registered: " + module + " with id " + json.getString("_id"))
             case Failure(error) =>
-              req.response.end("Error registering module: " + error.getMessage())
+              req.response.end("Error occured while registering module: " + error.getMessage())
           }
         } else {
           req.response.setChunked(true)
           req.response.putHeader("Content-type", "text/html")
 
-          req.response.write("<p>Errors registering module:</p>\n")
+          req.response.write("<p>Errors occured while registering module:</p>\n")
           req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
           req.response.end("<p>Please re-submit.</p>")
         }
