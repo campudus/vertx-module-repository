@@ -120,7 +120,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
               req.response.end("Error occured while searching for modules: " + error.getMessage())
           }
         } else {
-          //
+          req.response.end
         }
       })
     })
