@@ -32,6 +32,9 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
     }
   }
 
+  def tryOp[T](f: => T): Option[T] = try { Some(f) } catch { case _: Throwable => None }
+  def toInt(s: String): Option[Int] = tryOp(s.toInt)
+
   override def start() {
     val rm = new RouteMatcher
 
@@ -42,11 +45,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
       req.response.sendFile(getWebPath() + "/register.html")
     })
 
-    rm.get("/last-approved-modules", {
+    rm.get("/latest-approved-modules", {
       req: HttpServerRequest =>
-        //    	  req.params().get("limit") match {
-        //        case str: String =>
-        lastApprovedModules(vertx, 5).onComplete {
+        val limit = req.params().get("limit") match {
+          case s: String => toInt(s).getOrElse(5)
+          case _ => 5
+        }
+
+        latestApprovedModules(vertx, limit).onComplete {
           case Success(modules) =>
             /*
              {modules: [{...},{...}]}
@@ -57,8 +63,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           case Failure(error) =>
             req.response.end("Error occured while listing last approved modules: " + error.getMessage())
         }
-      //        case _ => 
-      //      }
+
     })
 
     rm.get("/unapproved", {
