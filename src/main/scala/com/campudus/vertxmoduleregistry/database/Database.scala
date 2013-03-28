@@ -94,7 +94,7 @@ object Database extends VertxScalaHelpers {
     p.future
   }
 
-  def lastApprovedModules(vertx: Vertx, limit: Int): Future[List[Module]] = {
+  def latestApprovedModules(vertx: Vertx, limit: Int): Future[List[Module]] = {
     val p = Promise[List[Module]]
     vertx.eventBus().send(dbAddress,
       json
