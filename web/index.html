@@ -7,7 +7,7 @@
 <script src="js/jquery.js" type="text/javascript"></script>
 <script>
   function fillLatestApprovedModules() {
-    $.getJSON('/latest-approved-modules.json', function(data) {
+    $.getJSON('/latest-approved-modules', function(data) {
       var item, items = '<ul>', modules = data.modules;
       while (modules.length) {
         item = modules.pop();
@@ -25,7 +25,9 @@
         function(event) {
           event.preventDefault();
 
-          $.postJSON('/search.json', function(data) {
+          $.post('/search', {
+            query : $('#query').val()
+          }, function(data) {
             var item, items = '<ul>', modules = data.modules;
             while (modules.length) {
               item = modules.pop();
@@ -33,10 +35,11 @@
                   + '~' + item.version + '</a></li>';
             }
             items += '</ul>';
+            console.log('data: ' + JSON.stringify(data));
             $('#searchResults').empty();
             $('#searchResults').append(items);
             $('#searchResultContainer').show();
-          });
+          }, 'json');
         });
   }
 
@@ -56,7 +59,7 @@
 				<fieldset>
 					<legend>Search for modules</legend>
 					<div>
-						<input type="text" name="query" placeholder="Query for modules" />
+						<input type="text" name="query" placeholder="Query for modules" id="query"/>
 					</div>
 					<button type="submit">Search</button>
 				</fieldset>
