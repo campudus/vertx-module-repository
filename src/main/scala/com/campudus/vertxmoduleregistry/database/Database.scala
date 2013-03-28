@@ -34,7 +34,7 @@ object Database extends VertxScalaHelpers {
       .putBoolean("approved", approved)
   }
   object Module {
-    def fromJson(json: JsonObject): Option[Module] = tryOp({
+    def fromJson(json: JsonObject): Option[Module] = tryOp {
       val downloadUrl = json.getString("downloadUrl")
       val modname = json.getString("name")
       val modowner = json.getString("owner")
@@ -51,7 +51,7 @@ object Database extends VertxScalaHelpers {
       val approved = json.getBoolean("approved")
 
       Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, license, keywords, timeRegistered, timeApproved, approved)
-    })
+    }
   }
 
   def searchModules(vertx: Vertx, search: String): Future[List[Module]] = {
@@ -79,11 +79,14 @@ object Database extends VertxScalaHelpers {
           msg.body.getString("status") match {
             case "ok" =>
               import scala.collection.JavaConversions._
-              val it = msg.body.getArray("results").iterator()
-              val modules = for (m <- msg.body.getArray("results")) yield {
-                m match {
-                  case m: JsonObject => Module.fromJson(m).get
-                }
+              val modules = msg.body.getArray("results").flatMap {
+                m =>
+                  m match {
+                    case m: JsonObject => Module.fromJson(m) match {
+                      case Some(someMod) => List(someMod)
+                      case None => List()
+                    }
+                  }
               }
               p.success(modules.toList)
 
@@ -108,10 +111,14 @@ object Database extends VertxScalaHelpers {
             case "ok" =>
               import scala.collection.JavaConversions._
               val it = msg.body.getArray("results").iterator()
-              val modules = for (m <- msg.body.getArray("results")) yield {
-                m match {
-                  case m: JsonObject => Module.fromJson(m).get
-                }
+              val modules = msg.body.getArray("results").flatMap {
+                m =>
+                  m match {
+                    case m: JsonObject => Module.fromJson(m) match {
+                      case Some(someMod) => List(someMod)
+                      case None => List()
+                    }
+                  }
               }
               p.success(modules.toList)
 
@@ -135,10 +142,14 @@ object Database extends VertxScalaHelpers {
             case "ok" =>
               import scala.collection.JavaConversions._
               val it = msg.body.getArray("results").iterator()
-              val modules = for (result <- msg.body.getArray("results")) yield {
-                result match {
-                  case j: JsonObject => Module.fromJson(j).get
-                }
+              val modules = msg.body.getArray("results").flatMap {
+                m =>
+                  m match {
+                    case m: JsonObject => Module.fromJson(m) match {
+                      case Some(someMod) => List(someMod)
+                      case None => List()
+                    }
+                  }
               }
               p.success(modules.toList)
 
@@ -159,7 +170,7 @@ object Database extends VertxScalaHelpers {
         .putObject("objNew", json.putObject("$set", json.putBoolean("approved", true))), {
         msg: Message[JsonObject] =>
           msg.body.getString("status") match {
-            case "ok" => p.success(msg.body)
+            case "ok" => p.success(json.putString("status", "ok").putString("id", id))
             case "error" => p.failure(new DatabaseException(msg.body.getString("message")))
           }
       })

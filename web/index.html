@@ -5,6 +5,7 @@
 <link rel="stylesheet" type="text/css" href="/css/normalize.css" />
 <link rel="stylesheet" type="text/css" href="/css/main.css" />
 <script src="js/jquery.js" type="text/javascript"></script>
+<script src="js/jquery.cookie.js" type="text/javascript"></script>
 <script>
   function fillLatestApprovedModules() {
     $.getJSON('/latest-approved-modules', function(data) {
@@ -43,42 +44,74 @@
         });
   }
 
+  function createLoginFormSubmitHandler() {
+    $('#loginForm').submit(function(event) {
+
+      event.preventDefault();
+      $.post('/login', {
+        username : $('#username').val(),
+        password : $('#password').val()
+      }, function(data) {
+        if (data.status == 'ok' && data.sessionId) {
+          var sessionId = data.sessionId;
+          $.cookie('sessionId', sessionId);
+        }
+      }, 'json');
+
+    });
+  }
+
   $(document).ready(function() {
+    createLoginFormSubmitHandler();
     fillLatestApprovedModules();
     createSearchFormSubmitHandler();
   });
 </script>
 </head>
 <body>
-	<h1>Vert.x Module Registry</h1>
-	<p>This is the Vert.x module registry. Here you can find all modules published by Vert.x users.</p>
-	<div id="search">
-		<h2>Search</h2>
-		<div id="searchForModules">
-			<form action="/search" method="post" id="searchForm">
-				<fieldset>
-					<legend>Search for modules</legend>
-					<div>
-						<input type="text" name="query" placeholder="Query for modules" id="query"/>
-					</div>
-					<button type="submit">Search</button>
-				</fieldset>
-			</form>
-		</div>
-		<div id="searchResultContainer">
-			<h2>Search results</h2>
-			<div id="searchResults"></div>
-		</div>
+	<div id="header">
+		<form id="loginForm" action="/login" method="post">
+			<input type="text" id="username" name="username"
+				placeholder="Username" /> <input type="password" id="password"
+				name="password" placeholder="Password" />
+			<button type="submit">Login</button>
+		</form>
 	</div>
-	<div id="stats">
-		<h2>Latest approved modules</h2>
-		<div id="latestApprovedModules"></div>
-	</div>
-	<div id="further">
-		<h2>Register your own module</h2>
-		<p>
-			To register your own module, simply fill out the <a href="/register">registration form</a>.
-		</p>
+
+	<div id="container">
+		<h1>Vert.x Module Registry</h1>
+		<p>This is the Vert.x module registry. Here you can find all
+			modules published by Vert.x users.</p>
+		<div id="search">
+			<h2>Search</h2>
+			<div id="searchForModules">
+				<form action="/search" method="post" id="searchForm">
+					<fieldset>
+						<legend>Search for modules</legend>
+						<div>
+							<input type="text" name="query" placeholder="Query for modules"
+								id="query" />
+						</div>
+						<button type="submit">Search</button>
+					</fieldset>
+				</form>
+			</div>
+			<div id="searchResultContainer">
+				<h2>Search results</h2>
+				<div id="searchResults"></div>
+			</div>
+		</div>
+		<div id="stats">
+			<h2>Latest approved modules</h2>
+			<div id="latestApprovedModules"></div>
+		</div>
+		<div id="further">
+			<h2>Register your own module</h2>
+			<p>
+				To register your own module, simply fill out the <a href="/register">registration
+					form</a>.
+			</p>
+		</div>
 	</div>
 </body>
 </html>

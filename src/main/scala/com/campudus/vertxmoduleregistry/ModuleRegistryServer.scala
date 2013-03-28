@@ -8,6 +8,7 @@ import com.campudus.vertx.helpers.VertxScalaHelpers
 import org.vertx.java.core.buffer.Buffer
 import com.campudus.vertx.helpers.PostRequestReader
 import com.campudus.vertxmoduleregistry.database.Database._
+import com.campudus.vertxmoduleregistry.security.Authentication._
 import org.vertx.java.core.json.JsonObject
 import org.vertx.java.core.json.JsonArray
 import scala.util.Success
@@ -58,7 +59,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
             modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
             req.response.end(json.putArray("modules", modulesArray).encode)
           case Failure(error) =>
-            req.response.end("Error occured while listing last approved modules: " + error.getMessage())
+            req.response.end(json.putString("status", "failed").putString("message", error.getMessage()).encode)
         }
 
     })
@@ -71,7 +72,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
             modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
             req.response.end(json.putArray("modules", modulesArray).encode)
           case Failure(error) =>
-            req.response.end("Error occured while listing unapproved modules: " + error.getMessage())
+            req.response.end(json.putString("status", "failed").putString("message", error.getMessage()).encode)
         }
     })
 
@@ -81,23 +82,27 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
           implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
+          val sessionId = getRequiredParam("sessionId", "Session ID required")
           val id = getRequiredParam("_id", "Module ID required")
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            approve(vertx, id).onComplete {
-              case Success(json) =>
-                req.response.end("Successfully approved module: " + id)
+            authorise(vertx, sessionId).onComplete {
+              case Success(username) =>
+                approve(vertx, id).onComplete {
+                  case Success(json) =>
+                    req.response.end(json.encode())
+                  case Failure(error) =>
+                    req.response.end(json.putString("status", "failed").putString("message", error.getMessage()).encode)
+                }
               case Failure(error) =>
-                req.response.end("Error occured while approving module: " + error.getMessage())
+                req.response.end(json.putString("status", "denied").encode())
             }
-          } else {
-            req.response.setChunked(true)
-            req.response.putHeader("Content-type", "text/html")
 
-            req.response.write("<p>Errors occured while approving module:</p>\n")
-            req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
-            req.response.end("<p>Please re-submit.</p>")
+          } else {
+            val errorsAsJsonArr = new JsonArray
+            errors.foreach(err => errorsAsJsonArr.addString(err))
+            req.response.end(json.putString("status", "error").putArray("messages", errorsAsJsonArr).encode)
           }
         })
     })
@@ -113,11 +118,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
         if (errors.isEmpty) {
           searchModules(vertx, query).onComplete {
             case Success(modules) =>
-              req.response.setChunked(true)
-              modules.map(_.toJson.encode()).foreach(m => req.response.write(m.toString()))
-              req.response.end
+              val modulesArray = new JsonArray()
+              modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
+              req.response.end(json.putArray("modules", modulesArray).encode)
             case Failure(error) =>
-              req.response.end("Error occured while searching for modules: " + error.getMessage())
+              req.response.end(json.putString("status", "failed").putString("message", error.getMessage()).encode)
           }
         } else {
           req.response.end
@@ -153,17 +158,61 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
             case Success(json) =>
               req.response.end("Registered: " + module + " with id " + json.getString("_id"))
             case Failure(error) =>
-              req.response.end("Error occured while registering module: " + error.getMessage())
+              req.response.end(json.putString("status", "failed").putString("message", error.getMessage()).encode)
           }
         } else {
-          req.response.setChunked(true)
-          req.response.putHeader("Content-type", "text/html")
-
-          req.response.write("<p>Errors occured while registering module:</p>\n")
-          req.response.write(errors.mkString("<ul>\n<li>", "</li>\n<li>", "</li>\n</ul>"))
-          req.response.end("<p>Please re-submit.</p>")
+          val errorsAsJsonArr = new JsonArray
+          errors.foreach(err => errorsAsJsonArr.addString(err))
+          req.response.end(json.putString("status", "error").putArray("messages", errorsAsJsonArr).encode)
         }
 
+      })
+    })
+
+    rm.post("/login", { req: HttpServerRequest =>
+      req.dataHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val username = getRequiredParam("username", "Missing username")
+        val password = getRequiredParam("password", "Missing password")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          login(vertx, username, password).onComplete {
+            case Success(sessionId) =>
+              req.response.end(json.putString("status", "ok").putString("sessionId", sessionId).encode)
+            case Failure(error) =>
+              req.response.end(json.putString("status", "denied").encode())
+          }
+        } else {
+          val errorsAsJsonArr = new JsonArray
+          errors.foreach(err => errorsAsJsonArr.addString(err))
+          req.response.end(json.putString("status", "error").putArray("messages", errorsAsJsonArr).encode)
+        }
+      })
+    })
+
+    rm.post("/logout", { req: HttpServerRequest =>
+      req.dataHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val sessionId = getRequiredParam("sessionId", "Session ID required")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          logout(vertx, sessionId).onComplete {
+            case Success(oldSessionId) =>
+              req.response.end(json.putString("status", "ok").putString("sessionID", oldSessionId).encode)
+            case Failure(error) =>
+              req.response.end(json.putString("status", "failed").encode())
+          }
+        } else {
+          val errorsAsJsonArr = new JsonArray
+          errors.foreach(err => errorsAsJsonArr.addString(err))
+          req.response.end(json.putString("status", "error").putArray("messages", errorsAsJsonArr).encode)
+        }
       })
     })
 
