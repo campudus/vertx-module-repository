@@ -34,7 +34,7 @@ object Database extends VertxScalaHelpers {
       .putBoolean("approved", approved)
   }
   object Module {
-    def fromJson(json: JsonObject) = {
+    def fromJson(json: JsonObject): Option[Module] = tryOp({
       val downloadUrl = json.getString("downloadUrl")
       val modname = json.getString("name")
       val modowner = json.getString("owner")
@@ -51,7 +51,7 @@ object Database extends VertxScalaHelpers {
       val approved = json.getBoolean("approved")
 
       Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, license, keywords, timeRegistered, timeApproved, approved)
-    }
+    })
   }
 
   def searchModules(vertx: Vertx, search: String): Future[List[Module]] = {
@@ -82,7 +82,7 @@ object Database extends VertxScalaHelpers {
               val it = msg.body.getArray("results").iterator()
               val modules = for (m <- msg.body.getArray("results")) yield {
                 m match {
-                  case m: JsonObject => Module.fromJson(m)
+                  case m: JsonObject => Module.fromJson(m).get
                 }
               }
               p.success(modules.toList)
@@ -102,7 +102,7 @@ object Database extends VertxScalaHelpers {
         .putString("collection", "modules")
         .putNumber("limit", limit)
         .putObject("sort", json.putNumber("timeApproved", -1))
-        .putObject("matcher", json), {
+        .putObject("matcher", json.putBoolean("approved", true)), {
         msg: Message[JsonObject] =>
           msg.body.getString("status") match {
             case "ok" =>
@@ -110,7 +110,7 @@ object Database extends VertxScalaHelpers {
               val it = msg.body.getArray("results").iterator()
               val modules = for (m <- msg.body.getArray("results")) yield {
                 m match {
-                  case m: JsonObject => Module.fromJson(m)
+                  case m: JsonObject => Module.fromJson(m).get
                 }
               }
               p.success(modules.toList)
@@ -135,9 +135,9 @@ object Database extends VertxScalaHelpers {
             case "ok" =>
               import scala.collection.JavaConversions._
               val it = msg.body.getArray("results").iterator()
-              val modules = for (m <- msg.body.getArray("results")) yield {
-                m match {
-                  case m: JsonObject => Module.fromJson(m)
+              val modules = for (result <- msg.body.getArray("results")) yield {
+                result match {
+                  case j: JsonObject => Module.fromJson(j).get
                 }
               }
               p.success(modules.toList)

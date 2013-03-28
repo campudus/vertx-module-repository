@@ -32,9 +32,6 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
     }
   }
 
-  def tryOp[T](f: => T): Option[T] = try { Some(f) } catch { case _: Throwable => None }
-  def toInt(s: String): Option[Int] = tryOp(s.toInt)
-
   override def start() {
     val rm = new RouteMatcher
 

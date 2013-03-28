@@ -19,6 +19,9 @@ trait VertxScalaHelpers {
   implicit def fnToAsyncHandler[T](fn: AsyncResult[T] => Any): AsyncResultHandler[T] = new AsyncResultHandler[T]() {
     override def handle(result: AsyncResult[T]) = fn(result)
   }
+  
+  def tryOp[T](f: => T): Option[T] = try { Some(f) } catch { case _: Throwable => None }
+  def toInt(s: String): Option[Int] = tryOp(s.toInt)
 }
 
 object VertxScalaHelpers extends VertxScalaHelpers
