@@ -8,6 +8,7 @@ import org.vertx.java.core.json.JsonObject
 trait VertxScalaHelpers {
   def json() = new JsonObject()
 
+  import scala.language.implicitConversions
   implicit def fnToHandler[T <% X, X](fn: T => Any): Handler[X] = new Handler[X]() {
     override def handle(event: X) = fn(event.asInstanceOf[T])
   }
