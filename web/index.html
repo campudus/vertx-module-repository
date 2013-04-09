@@ -5,83 +5,237 @@
 <link rel="stylesheet" type="text/css" href="/css/normalize.css" />
 <link rel="stylesheet" type="text/css" href="/css/main.css" />
 <script src="js/jquery.js" type="text/javascript"></script>
-<script src="js/jquery.cookie.js" type="text/javascript"></script>
 <script>
-  function fillLatestApprovedModules() {
+  var sid;
+
+  function fillLatestApprovedMods() {
     $.getJSON('/latest-approved-modules', function(data) {
-      var item, items = '<ul>', modules = data.modules;
-      while (modules.length) {
-        item = modules.pop();
-        items += '<li><span class="date">' + item.timeApproved
-            + '</span> - <a href="' + item.projectUrl + '">' + item.owner + '~' + item.name + '~'
-            + item.version + '</a></li>';
-      }
-      items += '</ul>';
-      $('#latestApprovedModules').append(items);
+      $('#latestApprovedModules').append(getLiFromMods(data.modules));
     });
+  }
+
+  function getLiFromMods(modules) {
+    var item, items = '<ul>';
+    while (modules.length) {
+      item = modules.pop();
+      items += '<li><span class="date">' + formatTimestamp(item.timeApproved)
+          + '</span> - <a href="' + item.projectUrl + '">' + item.owner + '~' + item.name + '~'
+          + item.version + '</a></li>';
+    }
+    items += '</ul>';
+    return items;
+  }
+
+  function formatTimestamp(time) {
+    var date = new Date(time);
+    var months = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+        'Dec' ];
+    var year = date.getFullYear();
+    var month = months[date.getMonth()];
+    var day = date.getDate();
+    var hour = date.getHours();
+    var min = date.getMinutes();
+    var sec = date.getSeconds();
+    var time = day + ' ' + month + ' ' + year + ' ' + hour + ':' + min + ':' + sec;
+
+    return time;
   }
 
   function createSearchFormSubmitHandler() {
-    $('#searchForm').submit(
-        function(event) {
-          event.preventDefault();
-
-          $.post('/search', {
-            query : $('#query').val()
-          }, function(data) {
-            var item, items = '<ul>', modules = data.modules;
-            while (modules.length) {
-              item = modules.pop();
-              items += '<li><a href="' + item.projectUrl + '">' + item.owner + '~' + item.name
-                  + '~' + item.version + '</a></li>';
-            }
-            items += '</ul>';
-            console.log('data: ' + JSON.stringify(data));
-            $('#searchResults').empty();
-            $('#searchResults').append(items);
-            $('#searchResultContainer').show();
-          }, 'json');
-        });
-  }
-
-  function createLoginFormSubmitHandler() {
-    $('#loginForm').submit(function(event) {
-
+    $('#searchForm').submit(function(event) {
       event.preventDefault();
-      $.post('/login', {
-        username : $('#username').val(),
-        password : $('#password').val()
+      $.post('/search', {
+        query : $('#query').val()
       }, function(data) {
-        if (data.status == 'ok' && data.sessionId) {
-          var sessionId = data.sessionId;
-          $.cookie('sessionId', sessionId);
-        }
+        $('#searchResults').empty();
+        $('#searchResults').append(getLiFromMods(data.modules));
+        $('#searchResultContainer').show();
       }, 'json');
-
     });
   }
 
+  function createRegisterFormHandler() {
+    $('a.showRegister').click(showRegisterForm);
+    function showRegisterForm() {
+      if ($('#registerFormContainer').is(':empty')) {
+        $.get('/register.html', function(data) {
+          $('#registerFormContainer').append(data);
+        }, 'html')
+      }
+      $('#registerFormContainer').show();
+      displayHideLink();
+      return false;
+    }
+
+    function displayHideLink() {
+      $('a.showRegister').replaceWith('<a class="hideRegister">registration form</a>')
+      $('a.hideRegister').click(function() {
+        $('#registerFormContainer').hide();
+        displayShowLink();
+      });
+    }
+
+    function displayShowLink() {
+      $('a.hideRegister').replaceWith('<a class="showRegister">registration form</a>')
+      $('a.showRegister').click(showRegisterForm);
+    }
+  }
+
+  function createUnapprovedModsHandler() {
+    var loginContainer = $('#loginContainer');
+
+    function resetForm() {
+      $('#loginContainer #password').val('');
+      $('#loginContainer .errorMessage').hide();
+    }
+
+    function hideForm() {
+      $(loginContainer).fadeOut(300);
+      $('#mask').fadeOut(300, function() {
+        $(this).remove();
+      });
+    }
+
+    function showLoginErrorMessage(error) {
+      if ($('#loginContainer').is(':hidden')) {
+        resetForm();
+        showForm();
+      }
+      $('#loginContainer .errorMessage').show();
+      $('#loginContainer .errorMessage').html(error);
+    }
+
+    function showForm() {
+      $(loginContainer).fadeIn(300);
+
+      // Align the box
+      var margTop = $(loginContainer).height() / 2;
+      var margLeft = $(loginContainer).width() / 2;
+
+      $(loginContainer).css({
+        'margin-top' : -margTop,
+        'margin-left' : -margLeft
+      });
+
+      // Add mask to hide the background
+      $('body').append('<div id="mask"></div>');
+      $('#mask').fadeIn(300);
+
+      $("#mask").click(function() {
+        hideForm()
+        return false;
+      });
+    }
+
+    $('a.showUnapproved').click(showUnapproved);
+
+    function showUnapproved() {
+      if (sid) {
+        getUnapproved()
+      } else {
+        resetForm();
+        showForm();
+      }
+
+      return false;
+    }
+
+    $('a.close').click(function() {
+      hideForm();
+      return false;
+    });
+
+    $('#loginForm').submit(function(event) {
+      event.preventDefault();
+      $.post('/login', {
+        password : $('#password').val()
+      }, processLoginResult, 'json');
+    });
+
+    function processLoginResult(data) {
+      if (data.status == 'ok' && data.sessionID) {
+        sid = data.sessionID
+        getUnapproved();
+      } else if (data.status == 'error') {
+        processStatusError(data);
+      } else if (data.status == 'denied') {
+        showLoginErrorMessage("Wrong password");
+      } else {
+        showLoginErrorMessage("Access denied");
+      }
+    }
+
+    function getUnapproved() {
+      $.getJSON('/unapproved', {
+        sessionID : sid
+      }, function(data) {
+        if (data.modules) {
+          $('#unapprovedModules').empty();
+          $('#unapprovedModules').append(getLiFromMods(data.modules));
+          hideForm();
+          displayHideLink();
+        } else if (data.status == 'denied') {
+          showLoginErrorMessage("Bad session or session expired");
+        } else {
+          showLoginErrorMessage("Internal error");
+        }
+      })
+    }
+
+    function displayHideLink() {
+      $('a.showUnapproved').replaceWith('<a class="hideUnapproved">[Hide]</a>')
+      $('a.hideUnapproved').click(function() {
+        $('#unapprovedModules').empty();
+        displayShowLink();
+      });
+    }
+
+    function displayShowLink() {
+      $('a.hideUnapproved').replaceWith('<a class="showUnapproved">[Show]</a>')
+      $('a.showUnapproved').click(showUnapproved);
+    }
+
+    function processStatusError(data) {
+      var s = 'Missing password';
+      var messages = data.messages;
+      if (messages.length > 0) {
+        s = messages.pop();
+        while (messages.length)
+          s += '<br />' + messages.pop();
+      }
+      showLoginErrorMessage(s);
+    }
+  }
+
   $(document).ready(function() {
-    createLoginFormSubmitHandler();
-    fillLatestApprovedModules();
+    createRegisterFormHandler();
+    createUnapprovedModsHandler();
+    fillLatestApprovedMods();
     createSearchFormSubmitHandler();
   });
 </script>
 </head>
-<body>
-	<div id="header">
-		<form id="loginForm" action="/login" method="post">
-			<input type="text" id="username" name="username"
-				placeholder="Username" /> <input type="password" id="password"
-				name="password" placeholder="Password" />
-			<button type="submit">Login</button>
+<body id="container">
+	<div id="loginContainer">
+		<a class="close">X</a>
+		<form id="loginForm" method="post" action="/login">
+			<fieldset>
+				<label>Password <input type="password" id="password"
+					name="password" placeholder="Password" />
+				</label>
+				<button type="submit">Login</button>
+				<p class="errorMessage"></p>
+			</fieldset>
 		</form>
 	</div>
 
-	<div id="container">
+	<div id="header"></div>
+
+	<div id="main">
 		<h1>Vert.x Module Registry</h1>
 		<p>This is the Vert.x module registry. Here you can find all
 			modules published by Vert.x users.</p>
+
 		<div id="search">
 			<h2>Search</h2>
 			<div id="searchForModules">
@@ -101,16 +255,27 @@
 				<div id="searchResults"></div>
 			</div>
 		</div>
-		<div id="stats">
+
+		<div id="latest">
 			<h2>Latest approved modules</h2>
 			<div id="latestApprovedModules"></div>
 		</div>
-		<div id="further">
+
+		<div id="register">
 			<h2>Register your own module</h2>
 			<p>
-				To register your own module, simply fill out the <a href="/register">registration
-					form</a>.
+				To register your own module, simply fill out the <a
+					class="showRegister" href="/register">registration form</a>.
 			</p>
+			<div id="registerFormContainer"></div>
+		</div>
+
+		<div id="unapproved">
+			<h2>Unapproved modules</h2>
+			<p>
+				<a class="showUnapproved">[Show]</a>
+			</p>
+			<div id="unapprovedModules"></div>
 		</div>
 	</div>
 </body>

@@ -3,16 +3,73 @@ body {
 }
 
 /* SEARCH */
-
 #search {
 	text-align: center;
 }
+
 #search fieldset {
 	border: 0;
 }
+
 #search legend {
 	display: none;
 }
+
 #searchResultContainer {
 	display: none;
 }
+
+#registerFormContainer {
+	display: none;
+}
+
+#loginContainer {
+	display: none;
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	z-index: 99999;
+}
+
+#loginContainer .errorMessage {
+	color: red;
+	display: none;
+}
+
+#mask {
+    display: none;
+    background: #000;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.75;
+    z-index: 999;
+}
+
+.showUnapproved {
+	cursor: pointer;
+	color: green;
+}
+
+.hideUnapproved {
+	cursor: pointer;
+	color: purple;
+}
+
+.showRegister {
+	cursor: pointer;
+	color: green;
+}
+
+.hideRegister{
+	cursor: pointer;
+	color: purple;
+}
+
+.close {
+	cursor: pointer;
+	color: green;
+}
+

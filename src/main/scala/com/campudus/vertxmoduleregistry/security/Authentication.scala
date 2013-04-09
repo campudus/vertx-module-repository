@@ -1,11 +1,13 @@
 package com.campudus.vertxmoduleregistry.security
 
-import com.campudus.vertx.helpers.VertxScalaHelpers
+import scala.concurrent.Future
+import scala.concurrent.Promise
+
 import org.vertx.java.core.Vertx
-import scala.concurrent._
 import org.vertx.java.core.eventbus.Message
 import org.vertx.java.core.json.JsonObject
-import scala.None
+
+import com.campudus.vertx.helpers.VertxScalaHelpers
 
 object Authentication extends VertxScalaHelpers {
 
@@ -24,12 +26,12 @@ object Authentication extends VertxScalaHelpers {
     p.future
   }
 
-  def logout(vertx: Vertx, sessionId: String): Future[String] = {
+  def logout(vertx: Vertx, sessionID: String): Future[String] = {
     val p = Promise[String]
 
-    vertx.eventBus().send(authAddress + ".logout", json.putString("sessionId", sessionId), { msg: Message[JsonObject] =>
+    vertx.eventBus().send(authAddress + ".logout", json.putString("sessionID", sessionID), { msg: Message[JsonObject] =>
       msg.body.getString("status") match {
-        case "ok" => p.success(sessionId)
+        case "ok" => p.success(sessionID)
         case "error" => p.failure(new AuthenticationException("Logout failed"))
       }
     })
@@ -37,16 +39,14 @@ object Authentication extends VertxScalaHelpers {
     p.future
   }
 
-  def authorise(vertx: Vertx, sessionId: String): Future[String] = {
+  def authorise(vertx: Vertx, sessionID: String): Future[String] = {
     val p = Promise[String]
-
-    vertx.eventBus().send(authAddress + ".authorise", json.putString("sessionId", sessionId), { msg: Message[JsonObject] =>
+    vertx.eventBus().send(authAddress + ".authorise", json.putString("sessionID", sessionID), { msg: Message[JsonObject] =>
       msg.body.getString("status") match {
         case "ok" => p.success(msg.body.getString("username"))
         case "denied" => p.failure(new AuthenticationException("Authorization failed"))
       }
     })
-
     p.future
   }
 

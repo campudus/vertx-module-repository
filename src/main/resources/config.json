@@ -1,0 +1,15 @@
+{
+   "host":"localhost",
+   "port":8080,
+   "database":{
+      "host":"localhost",
+      "port":27017,
+      "db_name":"module_registry",
+      "username":"testuser",
+      "password":"testpw"
+   },
+   "auth":{
+      "user_collection":"users",
+      "session_timeout": 1800000
+   }
+}
