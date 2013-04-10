@@ -57,18 +57,13 @@
   function createRegisterFormHandler() {
     $('a.showRegister').click(showRegisterForm);
     function showRegisterForm() {
-      if ($('#registerFormContainer').is(':empty')) {
-        $.get('/register.html', function(data) {
-          $('#registerFormContainer').append(data);
-        }, 'html')
-      }
       $('#registerFormContainer').show();
       displayHideLink();
       return false;
     }
 
     function displayHideLink() {
-      $('a.showRegister').replaceWith('<a class="hideRegister">registration form</a>')
+      $('a.showRegister').replaceWith('<a class="hideRegister href-less">registration form</a>')
       $('a.hideRegister').click(function() {
         $('#registerFormContainer').hide();
         displayShowLink();
@@ -76,7 +71,7 @@
     }
 
     function displayShowLink() {
-      $('a.hideRegister').replaceWith('<a class="showRegister">registration form</a>')
+      $('a.hideRegister').replaceWith('<a class="showRegister href-less">registration form</a>')
       $('a.showRegister').click(showRegisterForm);
     }
   }
@@ -183,7 +178,7 @@
     }
 
     function displayHideLink() {
-      $('a.showUnapproved').replaceWith('<a class="hideUnapproved">[Hide]</a>')
+      $('a.showUnapproved').replaceWith('<a class="hideUnapproved href-less">[Hide]</a>')
       $('a.hideUnapproved').click(function() {
         $('#unapprovedModules').empty();
         displayShowLink();
@@ -191,7 +186,7 @@
     }
 
     function displayShowLink() {
-      $('a.hideUnapproved').replaceWith('<a class="showUnapproved">[Show]</a>')
+      $('a.hideUnapproved').replaceWith('<a class="showUnapproved href-less">[Show]</a>')
       $('a.showUnapproved').click(showUnapproved);
     }
 
@@ -207,75 +202,174 @@
     }
   }
 
+  function generateName() {
+    var nameA = [ "awesome", "amazing", "fantastic", "marvelous", "storming", "staggering",
+        "exciting", "mind-blowing", "astonishing", "handsome", "beautiful", "admirable", "lovely",
+        "gorgeous", "exceptional", "uncommon", "terribly nice", "outstanding", "fine-looking",
+        "well-favored", "glorious", "pulchritudinous", "ravishing", "stunning", "dazzling",
+        "mind-boggling", "attractive", "graceful", "pleasing", "charismatic", "enchanting" ];
+    var nameB = [ "men", "guys", "dudes", "fellows", "jossers", "wallahs", "blokes", "fellas",
+        "fellers", "chaps", "lads", "people", "humans", "geezers", "boys", "gorillas", "bananas",
+        "champs", "rockers", "pals" ];
+    var a = Math.floor(Math.random() * nameA.length);
+    var b = Math.floor(Math.random() * nameB.length);
+    var name = nameA[a] + ' ' + nameB[b];
+    return name;
+  }
+
+  function fillName() {
+    $('#footer .randomName').text(generateName());
+  }
+
   $(document).ready(function() {
     createRegisterFormHandler();
     createUnapprovedModsHandler();
     fillLatestApprovedMods();
     createSearchFormSubmitHandler();
+    fillName();
   });
 </script>
 </head>
 <body id="container">
-	<div id="loginContainer">
-		<a class="close">X</a>
-		<form id="loginForm" method="post" action="/login">
-			<fieldset>
-				<label>Password <input type="password" id="password"
-					name="password" placeholder="Password" />
-				</label>
-				<button type="submit">Login</button>
-				<p class="errorMessage"></p>
-			</fieldset>
-		</form>
-	</div>
-
-	<div id="header"></div>
-
-	<div id="main">
-		<h1>Vert.x Module Registry</h1>
-		<p>This is the Vert.x module registry. Here you can find all
-			modules published by Vert.x users.</p>
-
-		<div id="search">
-			<h2>Search</h2>
-			<div id="searchForModules">
-				<form action="/search" method="post" id="searchForm">
-					<fieldset>
-						<legend>Search for modules</legend>
-						<div>
-							<input type="text" name="query" placeholder="Query for modules"
-								id="query" />
+	<div id="container">
+		<div id="loginContainer">
+			<a class="close href-less"><img src="images/close.png" /></a>
+			<form id="loginForm" method="post" action="/login">
+				<fieldset>
+					<label> <span>Password</span> <input id="password"
+						type="password" placeholder="Password" value="" name="password">
+					</label>
+					<button type="submit">Login</button>
+					<span class="errorMessage">error</span>
+				</fieldset>
+			</form>
+		</div>
+		<div id="header">
+			<h1>
+				<span class="head">Vert.x Module Registry</span>
+			</h1>
+		</div>
+		<div id="main">
+			<div class="intro">
+				<p>This is the Vert.x module registry. Here you can find all
+					modules published by Vert.x users.</p>
+			</div>
+			<div id="search">
+				<h2>Search</h2>
+				<div id="searchForModules">
+					<form action="/search" method="post" id="searchForm">
+						<fieldset>
+							<legend>Search for modules</legend>
+							<div>
+								<input type="text" name="query" placeholder="Query for modules"
+									id="query" />
+							</div>
+							<button type="submit">Search</button>
+						</fieldset>
+					</form>
+				</div>
+				<div id="searchResultContainer">
+					<h2>Search results</h2>
+					<div id="searchResults"></div>
+				</div>
+			</div>
+			<div class="col" id="left">
+				<div id="latest">
+					<h3>Latest approved modules</h3>
+					<div id="latestApprovedModules"></div>
+				</div>
+				<div id="unapproved">
+					<h3>Unapproved modules</h3>
+					<p>
+						<a class="showUnapproved href-less">[Show]</a>
+					</p>
+					<div id="unapprovedModules"></div>
+				</div>
+			</div>
+			<div class="col" id="right">
+				<h3>You should also visit</h3>
+				<ul>
+					<li><a href="http://campudus.com"><img
+							src="images/campudus.png" alt="Campudus" /></a></li>
+					<li><a href="http://vertx.io/"><img src="images/vertx.png"
+							alt="GitHub" /></a></li>
+					<li><a href="https://github.com/"><img
+							src="images/github.png" alt="GitHub" /></a></li>
+				</ul>
+			</div>
+			<div id="register">
+				<h2>Register your own module</h2>
+				<div class="intro">
+					<p>
+						To register your own module, simply fill out the <a
+							class="showRegister href-less" href="/register">registration
+							form</a>.
+					</p>
+				</div>
+				<div id="registerFormContainer">
+					<p>Please fill in the fields and submit your module. You'll
+						need to wait for a moderator to approve your module. Feel free to
+						ping us in IRC on Freenode.</p>
+					<form id="registerForm" action="/register" method="POST">
+						<div class="columns">
+							<div class="col2" id="left">
+								<fieldset>
+									<legend>Module information</legend>
+									<label for="downloadUrl"><span>Download URL</span> <input
+										type="url" name="downloadUrl"
+										placeholder="Download URL for this module" required="required" />
+									</label> <label for="modname"><span>Name of your module
+											(same as modname in gradle.properties)</span> <input type="text"
+										name="modname" placeholder="Name of your module"
+										required="required" /> </label> <label for="modowner"><span>Owner
+											of the module (same as modowner in gradle.properties)</span> <input
+										type="text" name="modowner"
+										placeholder="Owner of the module (groupId)"
+										required="required" /> </label> <label for="version"><span>Version
+											of your module</span> <input type="text" name="version"
+										placeholder="Version of your module" required="required" /> </label>
+									<label for="vertxVersion"><span>Supported Vert.x
+											Version</span> <input type="text" name="vertxVersion"
+										placeholder="Supported Vert.x Version" /> </label>
+								</fieldset>
+							</div>
+							<div class="col2" id="left">
+								<fieldset>
+									<legend>Project information</legend>
+									<label for="projectUrl"><span>Project URL</span> <input
+										type="url" name="projectUrl" placeholder="Project URL" /> </label> <label
+										for="description"><span>Short description of
+											your module</span> <input type="text" name="description"
+										placeholder="Short description of your module"
+										required="required" /> </label> <label for="author"><span>Module
+											Author</span> <input type="text" name="author"
+										placeholder="Module Author" /> </label> <label for="email"><span>E-mail
+											of module author</span> <input type="email" name="email"
+										placeholder="E-mail of module author" required="required" />
+									</label> <span></span>
+								</fieldset>
+							</div>
+							<div class="col2" id="left">
+								<fieldset>
+									<legend>Module meta data</legend>
+									<label for="license"><span>Link to your license</span>
+										<input type="text" name="license"
+										placeholder="Link to your license" /> </label> <label for="keywords"><span>Comma
+											separated keywords / tags</span> <input type="text" name="keywords"
+										placeholder="Comma separated keywords / tags" /> </label>
+								</fieldset>
+							</div>
 						</div>
-						<button type="submit">Search</button>
-					</fieldset>
-				</form>
-			</div>
-			<div id="searchResultContainer">
-				<h2>Search results</h2>
-				<div id="searchResults"></div>
+						<button type="submit">Submit for moderation</button>
+					</form>
+				</div>
 			</div>
 		</div>
-
-		<div id="latest">
-			<h2>Latest approved modules</h2>
-			<div id="latestApprovedModules"></div>
-		</div>
-
-		<div id="register">
-			<h2>Register your own module</h2>
+		<div id="footer">
 			<p>
-				To register your own module, simply fill out the <a
-					class="showRegister" href="/register">registration form</a>.
+				Made with aid of <span class="randomName">marvelous bananas</span>
+				at <a href="http://campudus.com">Campudus</a>
 			</p>
-			<div id="registerFormContainer"></div>
-		</div>
-
-		<div id="unapproved">
-			<h2>Unapproved modules</h2>
-			<p>
-				<a class="showUnapproved">[Show]</a>
-			</p>
-			<div id="unapprovedModules"></div>
 		</div>
 	</div>
 </body>

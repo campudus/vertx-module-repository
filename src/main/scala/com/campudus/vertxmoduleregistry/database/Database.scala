@@ -160,7 +160,7 @@ object Database extends VertxScalaHelpers {
     p.future
   }
 
-  def approve(vertx: Vertx, id: String) = {
+  def approve(vertx: Vertx, id: String): Future[JsonObject] = {
     val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,
       json
@@ -177,7 +177,7 @@ object Database extends VertxScalaHelpers {
     p.future
   }
 
-  def registerModule(vertx: Vertx, module: Module) = {
+  def registerModule(vertx: Vertx, module: Module): Future[JsonObject] = {
     val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,
       json

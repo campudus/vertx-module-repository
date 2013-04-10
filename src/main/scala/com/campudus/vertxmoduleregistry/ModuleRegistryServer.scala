@@ -23,6 +23,19 @@ import scala.concurrent.Promise
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
+  def doWithFuture[T](what: => Future[T], onSuccess: T => Unit, onFailure: Throwable => Unit): Unit = {
+    what.onComplete {
+      case Success(result) => onSuccess(result)
+      case Failure(error) => onFailure(error)
+    }
+  }
+
+  def doWithFuture[T](what: => Future[T], onSuccess: T => Unit): Unit = {
+    what.onSuccess {
+      case result => onSuccess(result)
+    }
+  }
+
   private def getRequiredParam(param: String, error: String)(implicit paramMap: Map[String, String], errors: collection.mutable.ListBuffer[String]) = {
     def addError() = {
       errors += error
@@ -38,17 +51,20 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
   def isAuthorised(vertx: Vertx, sessionID: String): Future[Boolean] = {
     val p = Promise[Boolean]
-    authorise(vertx, sessionID).onComplete {
-      case Success(username) => p.success(true)
-      case Failure(error) => p.success(false)
-    }
+
+    doWithFuture(authorise(vertx, sessionID), {
+      username: String => p.success(true)
+    }, {
+      error => p.success(false)
+    })
+
     p.future
   }
 
   private def respondFailed(message: String)(implicit request: HttpServerRequest) =
     request.response.end(json.putString("status", "failed").putString("message", message).encode)
 
-  private def respondError(messages: List[String])(implicit request: HttpServerRequest) = {
+  private def respondErrors(messages: List[String])(implicit request: HttpServerRequest) = {
     val errorsAsJsonArr = new JsonArray
     messages.foreach(m => errorsAsJsonArr.addString(m))
     request.response.end(json.putString("status", "error").putArray("messages", errorsAsJsonArr).encode)
@@ -74,34 +90,41 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           case _ => 5
         }
 
-        latestApprovedModules(vertx, limit).onComplete {
-          case Success(modules) =>
-            /*
+        doWithFuture(latestApprovedModules(vertx, limit), {
+          modules: List[Module] => /*
              {modules: [{...},{...}]}
              */
             val modulesArray = new JsonArray()
             modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
             req.response.end(json.putArray("modules", modulesArray).encode)
-          case Failure(error) =>
-            respondFailed(error.getMessage())
-        }
+        }, {
+          error => respondFailed(error.getMessage())
+        })
     })
 
     rm.get("/unapproved", {
       implicit req: HttpServerRequest =>
         req.params().get("sessionID") match {
-          case s: String =>
-            isAuthorised(vertx, s).onSuccess {
-              case true => unapproved(vertx).onComplete {
-                case Success(modules) =>
+          case s: String => {
+            def callUnapproved() = {
+              doWithFuture(unapproved(vertx), {
+                modules: List[Module] =>
                   val modulesArray = new JsonArray()
                   modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
                   req.response.end(json.putArray("modules", modulesArray).encode)
-                case Failure(error) =>
-                  respondFailed(error.getMessage())
-              }
-              case false => respondDenied
+              }, {
+                error => respondFailed(error.getMessage())
+              })
             }
+
+            doWithFuture(isAuthorised(vertx, s), {
+              result: Boolean =>
+                result match {
+                  case true => callUnapproved
+                  case false => respondDenied
+                }
+            })
+          }
           case _ => respondDenied
         }
 
@@ -118,14 +141,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            login(vertx, username, password).onComplete {
-              case Success(sessionID) =>
+            doWithFuture(login(vertx, username, password), {
+              sessionID: String =>
                 req.response.end(json.putString("status", "ok").putString("sessionID", sessionID).encode)
-              case Failure(error) =>
-                respondDenied
-            }
+            }, {
+              _ => respondDenied
+            })
           } else {
-            respondError(errors)
+            respondErrors(errors)
           }
         })
     })
@@ -141,20 +164,24 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            authorise(vertx, sessionID).onComplete {
-              case Success(username) =>
-                approve(vertx, id).onComplete {
-                  case Success(json) =>
-                    req.response.end(json.encode())
-                  case Failure(error) =>
-                    respondFailed(error.getMessage())
-                }
-              case Failure(error) =>
-                respondDenied
+            def callApprove() = {
+              doWithFuture(approve(vertx, id), {
+                json: JsonObject =>
+                  req.response.end(json.encode())
+              }, {
+                error => respondFailed(error.getMessage())
+              })
             }
 
+            doWithFuture(isAuthorised(vertx, sessionID), {
+              result: Boolean =>
+                result match {
+                  case true => callApprove
+                  case false => respondDenied
+                }
+            })
           } else {
-            respondError(errors)
+            respondErrors(errors)
           }
         })
     })
@@ -169,14 +196,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            searchModules(vertx, query).onComplete {
-              case Success(modules) =>
+            doWithFuture(searchModules(vertx, query), {
+              modules: List[Module] =>
                 val modulesArray = new JsonArray()
                 modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
                 req.response.end(json.putArray("modules", modulesArray).encode)
-              case Failure(error) =>
-                respondFailed(error.getMessage())
-            }
+            }, {
+              error => respondFailed(error.getMessage())
+            })
           } else {
             req.response.end
           }
@@ -208,16 +235,16 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           val errors = errorBuffer.result
           if (errors.isEmpty) {
             val module = Module(downloadUrl, name, owner, version, vertxVersion, description, projectUrl, author, email, license, keywords, System.currentTimeMillis())
-            registerModule(vertx, module).onComplete {
-              case Success(json) =>
-                req.response.end("Registered: " + module + " with id " + json.getString("_id"))
-              case Failure(error) =>
-                respondFailed(error.getMessage())
-            }
-          } else {
-            respondError(errors)
-          }
 
+            doWithFuture(registerModule(vertx, module), {
+              json: JsonObject =>
+                req.response.end("Registered: " + module + " with id " + json.getString("_id"))
+            }, {
+              error => respondFailed(error.getMessage())
+            })
+          } else {
+            respondErrors(errors)
+          }
         })
     })
 
@@ -231,14 +258,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            logout(vertx, sessionID).onComplete {
-              case Success(oldSessionID) =>
+            doWithFuture(logout(vertx, sessionID), {
+              oldSessionID: String =>
                 req.response.end(json.putString("status", "ok").putString("sessionID", oldSessionID).encode)
-              case Failure(error) =>
-                respondFailed(error.getMessage())
-            }
+            }, {
+              error => respondFailed(error.getMessage())
+            })
           } else {
-            respondError(errors)
+            respondErrors(errors)
           }
         })
     })
