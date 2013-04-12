@@ -1,5 +1,5 @@
-Styleneat        - CSS Organizer       . Return Download style.css       
-	| Copy style.css * {
+Styleneat  - CSS Organizer . Return Download style.css  | Copy style.css *
+	{
 	margin: 0;
 	padding: 0;
 }
@@ -55,7 +55,8 @@ h3 {
 	margin-bottom: 20px;
 	margin-left: 0;
 	margin-right: 0;
-	margin-top: 20px;
+	clear: both;
+	margin-top: 0px;
 }
 
 button {
@@ -68,7 +69,7 @@ button {
 	font-weight: bold;
 	margin-top: 10px;
 	padding: 5px;
-	width: 212px;
+	/* width: 212px; */
 	margin-bottom: 10px;
 }
 
@@ -100,7 +101,7 @@ fieldset label {
 fieldset label span {
 	display: block;
 	font-size: 11px;
-	font-weight: bold color:        #999;
+	font-weight: bold color:  #999;
 	margin-bottom: 2px;
 }
 
@@ -116,26 +117,40 @@ p {
 	margin: 5px 0 15px;
 }
 
-.col2 {
-	margin-bottom: 20px;
-	width: 275px;
-}
-
 .col {
 	margin-bottom: 20px;
-	width: 400px;
 }
 
 .col img {
 	border: 0px solid #eee;
 	margin-top: 0;
-	margin-right: 0px;
-	margin-bottom: 0px;
+	margin-right: 5px;
+	margin-bottom: 0;
 	margin-left: 0;
-	padding-top: 2px;
-	padding-right: 2px;
-	padding-bottom: 10px;
-	padding-left: 2px;
+}
+
+.col.left .topic {
+	clear: both;
+	float: left;
+	width: 500px;
+	margin-bottom: 10px;
+	margin-top: 10px;
+}
+
+.col.right .topic {
+	clear: both;
+	float: left;
+	width: 300px;
+	margin-bottom: 10px;
+	margin-top: 10px;
+}
+
+.col .reginfo {
+	clear: both;
+	float: left;
+	width: 250px;
+	margin-bottom: 10px;
+	margin-top: 10px;
 }
 
 .col ul {
@@ -143,16 +158,28 @@ p {
 	padding-left: 0px;
 }
 
+.col ul .mod {
+	clear: both;
+	float: left;
+}
+
+.col ul .mod .modname {
+	width: 425px;
+	line-height: 24px;
+	float: left;
+	width: 425px;
+	word-wrap: break-word;
+}
+
+.col ul .mod .buttons {
+	text-align: right;
+	float: right;
+}
+
 .col li {
 	list-style-image: none;
 	list-style-type: none;
-}
-
-.col li a {
-	padding-top: 5px;
-	padding-right: 5px;
-	padding-bottom: 5px;
-	padding-left: 0px;
+	margin-top: 10px;
 }
 
 #container {
@@ -176,7 +203,7 @@ p {
 	padding: 15px 0 1px 20px;
 }
 
-#left {
+.left {
 	float: left;
 }
 
@@ -236,12 +263,18 @@ p {
 	margin-top: 10px;
 }
 
-#right {
+#register #registerForm button {
+	float: left;
+	clear: both;
+}
+
+.right {
 	float: right;
 }
 
 #search {
 	text-align: center;
+	margin-bottom: 50px;
 }
 
 #search legend {
