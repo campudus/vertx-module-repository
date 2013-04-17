@@ -12,8 +12,9 @@ object Database extends VertxScalaHelpers {
 
   val dbAddress = "registry.database"
 
-  case class Module(downloadUrl: String, name: String, owner: String, version: String, vertxVersion: String, description: String, projectUrl: String, author: String, email: String, license: String, keywords: List[String], timeRegistered: Long, timeApproved: Long = -1, approved: Boolean = false) {
+  case class Module(downloadUrl: String, name: String, owner: String, version: String, vertxVersion: String, description: String, projectUrl: String, author: String, email: String, license: String, keywords: List[String], timeRegistered: Long, timeApproved: Long = -1, approved: Boolean = false, id: String = "") {
     def toJson(): JsonObject = json
+      .putString("_id", id)
       .putString("downloadUrl", downloadUrl)
       .putString("name", name)
       .putString("owner", owner)
@@ -35,6 +36,7 @@ object Database extends VertxScalaHelpers {
   }
   object Module {
     def fromJson(json: JsonObject): Option[Module] = tryOp {
+      val id = json.getString("_id")
       val downloadUrl = json.getString("downloadUrl")
       val modname = json.getString("name")
       val modowner = json.getString("owner")
@@ -50,21 +52,20 @@ object Database extends VertxScalaHelpers {
       val timeApproved = json.getLong("timeRegistered")
       val approved = json.getBoolean("approved")
 
-      Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, license, keywords, timeRegistered, timeApproved, approved)
+      Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, license, keywords, timeRegistered, timeApproved, approved, id)
     }
   }
 
   def searchModules(vertx: Vertx, search: String): Future[List[Module]] = {
-    val searchJson = json.
-      putArray("$or", new JsonArray()
-        .addObject(json.putObject("downloadUrl", json.putString("$regex", search)))
-        .addObject(json.putObject("name", json.putString("$regex", search)))
-        .addObject(json.putObject("owner", json.putString("$regex", search)))
-        .addObject(json.putObject("description", json.putString("$regex", search)))
-        .addObject(json.putObject("projectUrl", json.putString("$regex", search)))
-        .addObject(json.putObject("author", json.putString("$regex", search)))
-        .addObject(json.putObject("email", json.putString("$regex", search)))
-        .addObject(json.putObject("keywords", json.putString("$regex", search))))
+    val searchJson = json.putArray("$or", new JsonArray()
+      .addObject(json.putObject("downloadUrl", json.putString("$regex", search)))
+      .addObject(json.putObject("name", json.putString("$regex", search)))
+      .addObject(json.putObject("owner", json.putString("$regex", search)))
+      .addObject(json.putObject("description", json.putString("$regex", search)))
+      .addObject(json.putObject("projectUrl", json.putString("$regex", search)))
+      .addObject(json.putObject("author", json.putString("$regex", search)))
+      .addObject(json.putObject("email", json.putString("$regex", search)))
+      .addObject(json.putObject("keywords", json.putString("$regex", search)))).putBoolean("approved", true)
 
     println("Searching for with: " + searchJson.encode())
 
@@ -160,7 +161,7 @@ object Database extends VertxScalaHelpers {
     p.future
   }
 
-  def approve(vertx: Vertx, id: String) = {
+  def approve(vertx: Vertx, id: String): Future[JsonObject] = {
     val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,
       json
@@ -170,14 +171,14 @@ object Database extends VertxScalaHelpers {
         .putObject("objNew", json.putObject("$set", json.putBoolean("approved", true))), {
         msg: Message[JsonObject] =>
           msg.body.getString("status") match {
-            case "ok" => p.success(json.putString("status", "ok").putString("id", id))
+            case "ok" => p.success(json.putString("status", "ok").putString("_id", id))
             case "error" => p.failure(new DatabaseException(msg.body.getString("message")))
           }
       })
     p.future
   }
 
-  def registerModule(vertx: Vertx, module: Module) = {
+  def registerModule(vertx: Vertx, module: Module): Future[JsonObject] = {
     val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,
       json
