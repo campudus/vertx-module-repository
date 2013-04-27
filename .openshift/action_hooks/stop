@@ -5,4 +5,6 @@ kill `cat ${OPENSHIFT_DATA_DIR}/application.pid`
 #echo "Killing all java processes :-("
 #killall java
 
+echo "module registry stopped"
+
 exit 0

@@ -38,6 +38,8 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
           })
       })
     })
+
+    println("Modules should deploy async now.")
   }
 
   override def stop() {
