@@ -14,6 +14,8 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
   override def start() {
 
+    println("Starting module registry ...")
+
     val config = container.config()
     val configDb = config.getObject("database")
       .putString("address", Database.dbAddress)
