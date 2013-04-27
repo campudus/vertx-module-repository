@@ -8,7 +8,7 @@
 .yardoc
 .yardopts
 bin
-build
+build/
 target
 out
 *.iml
