@@ -10,7 +10,7 @@ echo "Starting Vert.x application!"
 
 if [[ -e "${VERTX_MODS}/${MODULE_NAME}" ]]; then
 	nohup bash -c "exec 'vertx' 'runmod' '${MODULE_NAME}' -repo vert-x.github.io &> ${OPENSHIFT_DIY_LOG_DIR}vert.x.log" &
-	echo $! > ../.openshift/application.pid
+	echo $! > ${OPENSHIFT_DATA_DIR}/application.pid
 else
 	echo "Module does not exist. Maybe problems with the build?"
 fi

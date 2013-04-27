@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#kill `cat ${OPENSHIFT_REPO_DIR}.openshift/application.pid`
+kill `cat ${OPENSHIFT_DATA_DIR}/application.pid`
 
-echo "Killing all java processes :-("
-killall java
+#echo "Killing all java processes :-("
+#killall java
 
 exit 0
