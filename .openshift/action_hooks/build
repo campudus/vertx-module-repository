@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cd $OPENSHIFT_REPO_DIR
+
+# Set a writable Gradle Home Dir
+echo SETTING GRADLE HOME
+export GRADLE_USER_HOME=$OPENSHIFT_DATA_DIR/gradle
+ 
+# Mark gradlew as executable
+chmod +x gradlew
+
+./gradlew modZip
+

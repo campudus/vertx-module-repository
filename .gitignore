@@ -21,3 +21,5 @@ test-results
 test-tmp
 *.class
 mods
+
+!.openshift/action_hooks/*
