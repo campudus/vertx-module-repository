@@ -10,5 +10,5 @@ export GRADLE_OPTS="-Dorg.gradle.daemon=false"
 # Mark gradlew as executable
 chmod +x gradlew
 
-./gradlew modZip
+./gradlew --no-daemon modZip
 
