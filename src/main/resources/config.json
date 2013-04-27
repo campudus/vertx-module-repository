@@ -1,12 +1,12 @@
 {
-   "host":"localhost",
-   "port":8080,
+   "host":"<HOST>",
+   "port":<PORT>,
    "database":{
-      "host":"localhost",
-      "port":27017,
-      "db_name":"module_registry",
-      "username":"testuser",
-      "password":"testpw"
+      "host":"<MONGO_HOST>",
+      "port":<MONGO_PORT>,
+      "db_name":"<MONGO_DB_NAME>",
+      "username":"<MONGO_USER>",
+      "password":"<MONGO_PASS>"
    },
    "auth":{
       "user_collection":"users",

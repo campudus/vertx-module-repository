@@ -2,6 +2,8 @@
 
 cd $OPENSHIFT_REPO_DIR
 
+. ".openshift/vertx-module-registry.config"
+
 # Set a writable Gradle Home Dir
 echo SETTING GRADLE HOME
 export GRADLE_USER_HOME=$OPENSHIFT_DATA_DIR/gradle
@@ -11,4 +13,6 @@ export GRADLE_OPTS="-Dorg.gradle.daemon=false"
 chmod +x gradlew
 
 ./gradlew --no-daemon modZip
+
+cat build/mods/${MODULE_NAME}/config.json | sed 's/<HOST>/${OPENSHIFT_DIY_IP}/;s/<PORT>/${OPENSHIFT_DIY_PORT}/;s/<MONGO_HOST>/${OPENSHIFT_MONGODB_DB_HOST}/;s/<MONGO_PORT>/${OPENSHIFT_MONGODB_DB_PORT}/;s/<MONGO_DB_NAME>/moduleregistry/;s/<MONGO_USER>/${OPENSHIFT_MONGODB_DB_USERNAME}/;s/<MONGO_PASS>/${OPENSHIFT_MONGODB_DB_PASSWORD}/' > ${OPENSHIFT_DATA_DIR}/config.json
 

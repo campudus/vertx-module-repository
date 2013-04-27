@@ -9,7 +9,7 @@ cd $OPENSHIFT_REPO_DIR
 echo "Starting Vert.x application!"
 
 if [[ -e "${VERTX_MODS}/${MODULE_NAME}" ]]; then
-	VERTX_MODS=${VERTX_MODS} vertx runmod ${MODULE_NAME} -repo vert-x.github.io &> ${OPENSHIFT_DIY_LOG_DIR}vert.x.log" &
+	VERTX_MODS="${VERTX_MODS}" vertx runmod ${MODULE_NAME} -conf "${OPENSHIFT_DATA_DIR}/config.json" -repo vert-x.github.io &> "${OPENSHIFT_DIY_LOG_DIR}vert.x.log" &
 	echo $! > ${OPENSHIFT_DATA_DIR}/application.pid
 else
 	echo "Module does not exist. Maybe problems with the build?"
