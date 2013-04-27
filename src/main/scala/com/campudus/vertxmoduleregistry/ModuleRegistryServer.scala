@@ -307,8 +307,8 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
       }
     })
 
-    val host = container.getConfig().getString("host")
-    val port = container.getConfig().getInteger("port")
+    val host = container.config().getString("host")
+    val port = container.config().getInteger("port")
 
     println("host: " + host)
     println("port: " + port)
@@ -331,8 +331,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
   private def deliver(file: String)(implicit request: HttpServerRequest): Unit = deliver(200, file)(request)
   private def deliver(statusCode: Int, file: String)(implicit request: HttpServerRequest) {
     println("Delivering: " + file + " with code " + statusCode)
-    request.response.statusCode = statusCode
-    request.response.sendFile(file)
+    request.response.setStatusCode(statusCode).sendFile(file)
   }
 
   private def deliverValidUrl(file: String)(implicit request: HttpServerRequest) {
