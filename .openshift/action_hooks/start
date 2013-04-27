@@ -1,0 +1,16 @@
+#!/bin/bash
+
+cd $OPENSHIFT_REPO_DIR
+
+. ".openshift/vertx-module-registry.config"
+
+cd $OPENSHIFT_REPO_DIR
+
+echo "Starting Vert.x application!"
+
+if [[ -e "${VERTX_MODS}/${MODULE_NAME}" ]]; then
+	nohup bash -c "exec 'vertx' 'runmod' '${MODULE_NAME}' -repo vert-x.github.io &> ${OPENSHIFT_DIY_LOG_DIR}vert.x.log" &
+	echo $! > ../.openshift/application.pid
+else
+	echo "Module does not exist. Maybe problems with the build?"
+fi
