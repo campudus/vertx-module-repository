@@ -238,7 +238,9 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
             doWithFuture(registerModule(vertx, module), {
               json: JsonObject =>
-                req.response.end("Registered: " + module + " with id " + json.getString("_id"))
+                req.response.setChunked(true)
+                req.response.write("Registered: " + module + " with id " + json.getString("_id"))
+                req.response.end("<a href=\"/\">Back to module registry</a>")
             }, {
               error => respondFailed(error.getMessage())
             })

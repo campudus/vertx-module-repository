@@ -7,12 +7,13 @@ import org.vertx.java.core.eventbus.Message
 import com.campudus.vertx.helpers.VertxScalaHelpers
 import scala.concurrent.Promise
 import scala.concurrent._
+import java.util.UUID
 
 object Database extends VertxScalaHelpers {
 
   val dbAddress = "registry.database"
 
-  case class Module(downloadUrl: String, name: String, owner: String, version: String, vertxVersion: String, description: String, projectUrl: String, author: String, email: String, license: String, keywords: List[String], timeRegistered: Long, timeApproved: Long = -1, approved: Boolean = false, id: String = "") {
+  case class Module(downloadUrl: String, name: String, owner: String, version: String, vertxVersion: String, description: String, projectUrl: String, author: String, email: String, license: String, keywords: List[String], timeRegistered: Long, timeApproved: Long = -1, approved: Boolean = false, id: String = UUID.randomUUID.toString) {
     def toJson(): JsonObject = json
       .putString("_id", id)
       .putString("downloadUrl", downloadUrl)
