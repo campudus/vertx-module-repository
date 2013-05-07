@@ -10,31 +10,72 @@ import scala.concurrent._
 import java.util.UUID
 
 object Database extends VertxScalaHelpers {
+  import scala.collection.JavaConverters._
 
   val dbAddress = "registry.database"
+  /*
+[16:59:32] <purplefox>   name - module identifier e.g. io.vertx~my-mod~1.0 
+[16:59:33] <purplefox>   description - text description
+[16:59:33] <purplefox>   license or licenses - JSON array
+[16:59:33] <purplefox>   homepage - url to homepage of project
+[16:59:33] <purplefox>   keywords - for search
+[16:59:33] <purplefox>   author - individual or organisation
+[16:59:35] <purplefox>   contributors - optional, array
+[16:59:37] <purplefox>   repository - url to repository - e.g. github url
+       */
 
-  case class Module(downloadUrl: String, name: String, owner: String, version: String, vertxVersion: String, description: String, projectUrl: String, author: String, email: String, license: String, keywords: List[String], timeRegistered: Long, timeApproved: Long = -1, approved: Boolean = false, id: String = UUID.randomUUID.toString) {
-    def toJson(): JsonObject = json
-      .putString("_id", id)
-      .putString("downloadUrl", downloadUrl)
-      .putString("name", name)
-      .putString("owner", owner)
-      .putString("version", version)
-      .putString("vertxVersion", vertxVersion)
-      .putString("description", description)
-      .putString("projectUrl", projectUrl)
-      .putString("author", author)
-      .putString("email", email)
-      .putString("license", license)
-      .putArray("keywords", {
-        val arr = new JsonArray()
-        keywords.foreach(k => arr.addString(k))
-        arr
-      })
-      .putNumber("timeRegistered", timeRegistered)
-      .putNumber("timeApproved", timeApproved)
-      .putBoolean("approved", approved)
+  private def stringListToArray(list: List[String]): JsonArray = {
+    val arr = new JsonArray()
+    list.foreach(k => arr.addString(k))
+    arr
   }
+
+  private def jsonArrayToStringList(arr: JsonArray): List[String] = {
+    (for (elem <- arr.toArray()) yield elem.toString).toList
+  }
+
+  case class Module(
+    downloadUrl: String,
+    name: String,
+    owner: String,
+    version: String,
+    vertxVersion: String,
+    description: String,
+    projectUrl: String,
+    author: String,
+    email: String,
+    licenses: List[String],
+    keywords: List[String],
+    timeRegistered: Long,
+    timeApproved: Long = -1,
+    contributors: Option[List[String]] = None,
+    approved: Boolean = false,
+    id: String = UUID.randomUUID.toString) {
+
+    def toJson(): JsonObject = {
+      val js = json.putString("_id", id)
+        .putString("downloadUrl", downloadUrl)
+        .putString("name", name)
+        .putString("owner", owner)
+        .putString("version", version)
+        .putString("vertxVersion", vertxVersion)
+        .putString("description", description)
+        .putString("projectUrl", projectUrl)
+        .putString("author", author)
+        .putString("email", email)
+        .putArray("licenses", stringListToArray(licenses))
+        .putArray("keywords", stringListToArray(keywords))
+        .putNumber("timeRegistered", timeRegistered)
+        .putNumber("timeApproved", timeApproved)
+        .putBoolean("approved", approved)
+
+      // Optional fields
+      contributors.map { contribs => js.putArray("contributors", stringListToArray(contribs)) }
+
+      js
+    }
+  }
+
   object Module {
     def fromJson(json: JsonObject): Option[Module] = tryOp {
       val id = json.getString("_id")
@@ -47,13 +88,14 @@ object Database extends VertxScalaHelpers {
       val projectUrl = json.getString("projectUrl")
       val author = json.getString("author")
       val email = json.getString("email")
-      val license = json.getString("license")
-      val keywords = (for (k <- json.getArray("keywords").toArray()) yield k.toString()).toList
+      val licenses = jsonArrayToStringList(json.getArray("licenses"))
+      val keywords = jsonArrayToStringList(json.getArray("keywords"))
       val timeRegistered = json.getLong("timeRegistered")
-      val timeApproved = json.getLong("timeRegistered")
+      val timeApproved = json.getLong("timeApproved")
+      val contibutors = Option(json.getArray("timeApproved")).map(jsonArrayToStringList(_))
       val approved = json.getBoolean("approved")
 
-      Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, license, keywords, timeRegistered, timeApproved, approved, id)
+      Module(downloadUrl, modname, modowner, version, vertxVersion, description, projectUrl, author, email, licenses, keywords, timeRegistered, timeApproved, contibutors, approved, id)
     }
   }
 

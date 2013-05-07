@@ -2,13 +2,11 @@ package com.campudus.vertxmoduleregistry
 
 import java.net.URL
 import java.net.URLDecoder
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.util.Failure
 import scala.util.Success
-
 import org.vertx.java.core.AsyncResult
 import org.vertx.java.core.Vertx
 import org.vertx.java.core.buffer.Buffer
@@ -18,7 +16,6 @@ import org.vertx.java.core.http.RouteMatcher
 import org.vertx.java.core.json.JsonArray
 import org.vertx.java.core.json.JsonObject
 import org.vertx.java.platform.Verticle
-
 import com.campudus.vertx.helpers.PostRequestReader
 import com.campudus.vertx.helpers.VertxFutureHelpers
 import com.campudus.vertx.helpers.VertxScalaHelpers
@@ -29,6 +26,7 @@ import com.campudus.vertxmoduleregistry.database.Database.unapproved
 import com.campudus.vertxmoduleregistry.security.Authentication.authorise
 import com.campudus.vertxmoduleregistry.security.Authentication.login
 import com.campudus.vertxmoduleregistry.security.Authentication.logout
+import com.campudus.vertxmoduleregistry.database.Database._
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
 
@@ -204,7 +202,17 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
           try {
             val downloadUrl = new URL(getRequiredParam("downloadUrl", "Download URL missing"))
-            downloadExtractAndRegister(downloadUrl)
+            for {
+              module <- downloadExtractAndRegister(downloadUrl)
+            } {
+              registerModule(vertx, module) onComplete {
+                case Success(json) =>
+                  req.response.setChunked(true)
+                  req.response.write("Registered: " + module + " with id " + json.getString("_id"))
+                  req.response.end("<a href=\"/\">Back to module registry</a>")
+                case Failure(error) => respondFailed(error.getMessage())
+              }
+            }
           } catch {
             case e: Exception => errorBuffer.append("Download URL could not be parsed")
           }
@@ -335,7 +343,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     }
   }
 
-  private def downloadExtractAndRegister(url: URL) {
+  private def downloadExtractAndRegister(url: URL): Future[Module] = {
     val tempUUID = java.util.UUID.randomUUID()
     val tempFile = "module-" + tempUUID + ".tmp.zip"
     val dirName = "module-" + tempUUID + ".tmp"
@@ -346,18 +354,9 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
       _ <- extract(zip, dirName)
       modJson <- open(dirName + "/mod.json") if (tempDir)
       content <- fileToString(modJson)
-    } {
+    } yield {
       val json = new JsonObject(content)
-      /*
-[16:59:32] <purplefox>   name - module identifier e.g. io.vertx~my-mod~1.0 
-[16:59:33] <purplefox>   description - text description
-[16:59:33] <purplefox>   license or licenses - JSON array
-[16:59:33] <purplefox>   homepage - url to homepage of project
-[16:59:33] <purplefox>   keywords - for search
-[16:59:33] <purplefox>   author - individual or organisation
-[16:59:35] <purplefox>   contributors - optional, array
-[16:59:37] <purplefox>   repository - url to repository - e.g. github url
-       */
+      Module.fromJson(json.putNumber("timeRegistered", System.currentTimeMillis())).get
     }
   }
 }
