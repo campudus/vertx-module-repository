@@ -23,19 +23,6 @@ import scala.concurrent.Promise
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
-  def doWithFuture[T](what: => Future[T], onSuccess: T => Unit, onFailure: Throwable => Unit): Unit = {
-    what.onComplete {
-      case Success(result) => onSuccess(result)
-      case Failure(error) => onFailure(error)
-    }
-  }
-
-  def doWithFuture[T](what: => Future[T], onSuccess: T => Unit): Unit = {
-    what.onSuccess {
-      case result => onSuccess(result)
-    }
-  }
-
   private def getRequiredParam(param: String, error: String)(implicit paramMap: Map[String, String], errors: collection.mutable.ListBuffer[String]) = {
     def addError() = {
       errors += error
@@ -52,11 +39,10 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
   def isAuthorised(vertx: Vertx, sessionID: String): Future[Boolean] = {
     val p = Promise[Boolean]
 
-    doWithFuture(authorise(vertx, sessionID), {
-      username: String => p.success(true)
-    }, {
-      error => p.success(false)
-    })
+    authorise(vertx, sessionID) onComplete {
+      case Success(username) => p.success(true)
+      case Failure(error) => p.success(false)
+    }
 
     p.future
   }
@@ -90,16 +76,15 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           case _ => 5
         }
 
-        doWithFuture(latestApprovedModules(vertx, limit), {
-          modules: List[Module] => /*
+        latestApprovedModules(vertx, limit) onComplete {
+          case Success(modules) => /*
              {modules: [{...},{...}]}
              */
             val modulesArray = new JsonArray()
             modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
             req.response.end(json.putArray("modules", modulesArray).encode)
-        }, {
-          error => respondFailed(error.getMessage())
-        })
+          case Failure(error) => respondFailed(error.getMessage())
+        }
     })
 
     rm.get("/unapproved", {
@@ -107,23 +92,19 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
         req.params().get("sessionID") match {
           case s: String => {
             def callUnapproved() = {
-              doWithFuture(unapproved(vertx), {
-                modules: List[Module] =>
+              unapproved(vertx) onComplete {
+                case Success(modules) =>
                   val modulesArray = new JsonArray()
                   modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
                   req.response.end(json.putArray("modules", modulesArray).encode)
-              }, {
-                error => respondFailed(error.getMessage())
-              })
+                case Failure(error) => respondFailed(error.getMessage())
+              }
             }
 
-            doWithFuture(isAuthorised(vertx, s), {
-              result: Boolean =>
-                result match {
-                  case true => callUnapproved
-                  case false => respondDenied
-                }
-            })
+            isAuthorised(vertx, s) map {
+              case true => callUnapproved
+              case false => respondDenied
+            }
           }
           case _ => respondDenied
         }
@@ -141,12 +122,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            doWithFuture(login(vertx, username, password), {
-              sessionID: String =>
+            login(vertx, username, password) onComplete {
+              case Success(sessionID) =>
                 req.response.end(json.putString("status", "ok").putString("sessionID", sessionID).encode)
-            }, {
-              _ => respondDenied
-            })
+              case Failure(_) => respondDenied
+            }
           } else {
             respondErrors(errors)
           }
@@ -165,21 +145,17 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           val errors = errorBuffer.result
           if (errors.isEmpty) {
             def callApprove() = {
-              doWithFuture(approve(vertx, id), {
-                json: JsonObject =>
+              approve(vertx, id) onComplete {
+                case Success(json) =>
                   req.response.end(json.encode())
-              }, {
-                error => respondFailed(error.getMessage())
-              })
+                case Failure(error) => respondFailed(error.getMessage())
+              }
             }
 
-            doWithFuture(isAuthorised(vertx, sessionID), {
-              result: Boolean =>
-                result match {
-                  case true => callApprove
-                  case false => respondDenied
-                }
-            })
+            isAuthorised(vertx, sessionID) map {
+              case true => callApprove
+              case false => respondDenied
+            }
           } else {
             respondErrors(errors)
           }
@@ -196,14 +172,13 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            doWithFuture(searchModules(vertx, query), {
-              modules: List[Module] =>
+            searchModules(vertx, query) onComplete {
+              case Success(modules) =>
                 val modulesArray = new JsonArray()
                 modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
                 req.response.end(json.putArray("modules", modulesArray).encode)
-            }, {
-              error => respondFailed(error.getMessage())
-            })
+              case Failure(error) => respondFailed(error.getMessage())
+            }
           } else {
             req.response.end
           }
@@ -236,14 +211,13 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           if (errors.isEmpty) {
             val module = Module(downloadUrl, name, owner, version, vertxVersion, description, projectUrl, author, email, license, keywords, System.currentTimeMillis())
 
-            doWithFuture(registerModule(vertx, module), {
-              json: JsonObject =>
+            registerModule(vertx, module) onComplete {
+              case Success(json) =>
                 req.response.setChunked(true)
                 req.response.write("Registered: " + module + " with id " + json.getString("_id"))
                 req.response.end("<a href=\"/\">Back to module registry</a>")
-            }, {
-              error => respondFailed(error.getMessage())
-            })
+              case Failure(error) => respondFailed(error.getMessage())
+            }
           } else {
             respondErrors(errors)
           }
@@ -260,12 +234,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            doWithFuture(logout(vertx, sessionID), {
-              oldSessionID: String =>
+            logout(vertx, sessionID) onComplete {
+              case Success(oldSessionID) =>
                 req.response.end(json.putString("status", "ok").putString("sessionID", oldSessionID).encode)
-            }, {
-              error => respondFailed(error.getMessage())
-            })
+              case Failure(error) => respondFailed(error.getMessage())
+            }
           } else {
             respondErrors(errors)
           }
