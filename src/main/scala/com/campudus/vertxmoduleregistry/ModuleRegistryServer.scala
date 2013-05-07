@@ -1,27 +1,36 @@
 package com.campudus.vertxmoduleregistry
 
-import org.vertx.java.platform.Verticle
-import org.vertx.java.core.http.RouteMatcher
-import org.vertx.java.core.http.HttpServerRequest
-import org.vertx.java.core.Handler
-import com.campudus.vertx.helpers.VertxScalaHelpers
-import org.vertx.java.core.buffer.Buffer
-import com.campudus.vertx.helpers.PostRequestReader
-import com.campudus.vertxmoduleregistry.database.Database._
-import com.campudus.vertxmoduleregistry.security.Authentication._
-import org.vertx.java.core.json.JsonObject
-import org.vertx.java.core.json.JsonArray
-import scala.util.Success
-import scala.util.Failure
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.net.URL
 import java.net.URLDecoder
-import org.vertx.java.core.AsyncResult
-import org.vertx.java.core.file.FileProps
-import org.vertx.java.core.Vertx
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Promise
+import scala.util.Failure
+import scala.util.Success
 
-class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
+import org.vertx.java.core.AsyncResult
+import org.vertx.java.core.Vertx
+import org.vertx.java.core.buffer.Buffer
+import org.vertx.java.core.file.FileProps
+import org.vertx.java.core.http.HttpServerRequest
+import org.vertx.java.core.http.RouteMatcher
+import org.vertx.java.core.json.JsonArray
+import org.vertx.java.core.json.JsonObject
+import org.vertx.java.platform.Verticle
+
+import com.campudus.vertx.helpers.PostRequestReader
+import com.campudus.vertx.helpers.VertxFutureHelpers
+import com.campudus.vertx.helpers.VertxScalaHelpers
+import com.campudus.vertxmoduleregistry.database.Database.approve
+import com.campudus.vertxmoduleregistry.database.Database.latestApprovedModules
+import com.campudus.vertxmoduleregistry.database.Database.searchModules
+import com.campudus.vertxmoduleregistry.database.Database.unapproved
+import com.campudus.vertxmoduleregistry.security.Authentication.authorise
+import com.campudus.vertxmoduleregistry.security.Authentication.login
+import com.campudus.vertxmoduleregistry.security.Authentication.logout
+
+class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
 
   private def getRequiredParam(param: String, error: String)(implicit paramMap: Map[String, String], errors: collection.mutable.ListBuffer[String]) = {
     def addError() = {
@@ -187,12 +196,21 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
 
     rm.post("/register", {
       implicit req: HttpServerRequest =>
-        req.dataHandler({ buf: Buffer =>
+        val buf = new Buffer(0)
+        req.dataHandler({ buffer: Buffer => buf.appendBuffer(buffer) })
+        req.endHandler({ () =>
           implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
-
           implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
-          val downloadUrl = getRequiredParam("downloadUrl", "Download URL missing")
+          try {
+            val downloadUrl = new URL(getRequiredParam("downloadUrl", "Download URL missing"))
+            downloadExtractAndRegister(downloadUrl)
+          } catch {
+            case e: Exception => errorBuffer.append("Download URL could not be parsed")
+          }
+        })
+
+      /*
           val name = getRequiredParam("modname", "Missing name")
           val owner = getRequiredParam("modowner", "Missing owner")
           val version = getRequiredParam("version", "Missing version of module")
@@ -221,7 +239,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
           } else {
             respondErrors(errors)
           }
-        })
+        }) */
     })
 
     rm.post("/logout", {
@@ -314,6 +332,32 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers {
       deliver(403, "errors/403.html")
     } else {
       deliver(file)
+    }
+  }
+
+  private def downloadExtractAndRegister(url: URL) {
+    val tempUUID = java.util.UUID.randomUUID()
+    val tempFile = "module-" + tempUUID + ".tmp.zip"
+    val dirName = "module-" + tempUUID + ".tmp"
+    for {
+      file <- open(tempFile)
+      zip <- download(url, file)
+      tempDir <- createDir(dirName)
+      _ <- extract(zip, dirName)
+      modJson <- open(dirName + "/mod.json") if (tempDir)
+      content <- fileToString(modJson)
+    } {
+      val json = new JsonObject(content)
+      /*
+[16:59:32] <purplefox>   name - module identifier e.g. io.vertx~my-mod~1.0 
+[16:59:33] <purplefox>   description - text description
+[16:59:33] <purplefox>   license or licenses - JSON array
+[16:59:33] <purplefox>   homepage - url to homepage of project
+[16:59:33] <purplefox>   keywords - for search
+[16:59:33] <purplefox>   author - individual or organisation
+[16:59:35] <purplefox>   contributors - optional, array
+[16:59:37] <purplefox>   repository - url to repository - e.g. github url
+       */
     }
   }
 }
