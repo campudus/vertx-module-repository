@@ -1,14 +1,15 @@
 package com.campudus.vertxmoduleregistry
 
-import org.vertx.java.platform.Verticle
-import com.campudus.vertx.helpers.VertxScalaHelpers
+import scala.concurrent.{Future, Promise}
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import org.vertx.java.core.AsyncResult
 import org.vertx.java.core.json.JsonObject
+import org.vertx.java.platform.Verticle
+
+import com.campudus.vertx.helpers.VertxScalaHelpers
 import com.campudus.vertxmoduleregistry.database.Database
 import com.campudus.vertxmoduleregistry.security.Authentication
-import org.vertx.java.core.AsyncResult
-import scala.concurrent.Future
-import scala.concurrent.Promise
-import scala.concurrent.ExecutionContext.Implicits._
 
 class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
@@ -40,17 +41,15 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
       }
     }
 
-    for {
-      mongoPersistor <- deployModule(mongoPersistorModName, configDb)
-      authManager <- deployModule(mongoPersistorModName, configAuth)
-      unzipModule <- deployModule(unzipModName, configUnzip)
-    } {
-      logger.error("deploying ModuleRegistryServer with " + config)
-      container.deployVerticle("com.campudus.vertxmoduleregistry.ModuleRegistryServer", config,
-        handleDeployError { deploymentId: String =>
-          logger.error("Module registry started")
-        })
-    }
+    val future = (deployModule(mongoPersistorModName, configDb)
+      .map(_ => deployModule(mongoPersistorModName, configAuth))
+      .map(_ => deployModule(unzipModName, configUnzip)))
+
+    logger.error("deploying ModuleRegistryServer with " + config)
+    container.deployVerticle("com.campudus.vertxmoduleregistry.ModuleRegistryServer", config,
+      handleDeployError { deploymentId: String =>
+        logger.error("Module registry started")
+      })
 
     logger.info("Modules should deploy async now.")
   }
@@ -63,6 +62,7 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
     val p = Promise[String]
     container.deployModule(name, config, { deployResult: AsyncResult[String] =>
       if (deployResult.succeeded()) {
+        println("started " + name + " with config " + config)
         p.success(deployResult.result())
       } else {
         println("failed to start " + name + " because of " + deployResult.cause())
