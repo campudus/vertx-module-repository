@@ -2,11 +2,13 @@ package com.campudus.vertxmoduleregistry
 
 import java.net.URL
 import java.net.URLDecoder
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.util.Failure
 import scala.util.Success
+
 import org.vertx.java.core.AsyncResult
 import org.vertx.java.core.Vertx
 import org.vertx.java.core.buffer.Buffer
@@ -16,17 +18,12 @@ import org.vertx.java.core.http.RouteMatcher
 import org.vertx.java.core.json.JsonArray
 import org.vertx.java.core.json.JsonObject
 import org.vertx.java.platform.Verticle
+
 import com.campudus.vertx.helpers.PostRequestReader
 import com.campudus.vertx.helpers.VertxFutureHelpers
 import com.campudus.vertx.helpers.VertxScalaHelpers
-import com.campudus.vertxmoduleregistry.database.Database.approve
-import com.campudus.vertxmoduleregistry.database.Database.latestApprovedModules
-import com.campudus.vertxmoduleregistry.database.Database.searchModules
-import com.campudus.vertxmoduleregistry.database.Database.unapproved
-import com.campudus.vertxmoduleregistry.security.Authentication.authorise
-import com.campudus.vertxmoduleregistry.security.Authentication.login
-import com.campudus.vertxmoduleregistry.security.Authentication.logout
 import com.campudus.vertxmoduleregistry.database.Database._
+import com.campudus.vertxmoduleregistry.security.Authentication._
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
 
@@ -67,6 +64,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     request.response.end(json.putString("status", "denied").encode())
 
   override def start() {
+    println("starting module registry")
     val rm = new RouteMatcher
 
     rm.get("/", { req: HttpServerRequest =>
@@ -308,19 +306,20 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
       }
     })
 
-    val host = container.config().getString("host")
-    val port = container.config().getInteger("port")
+    val config = Option(container.config()).getOrElse(json)
+    val host = config.getString("host", "localhost")
+    val port = config.getNumber("port", 8080)
 
     println("host: " + host)
     println("port: " + port)
     println("webpath: " + getWebPath())
 
-    vertx.createHttpServer().requestHandler(rm).listen(port, host);
-    println("started server")
+    vertx.createHttpServer().requestHandler(rm).listen(port.intValue(), host);
+    println("started module registry server")
   }
 
   override def stop() {
-    println("stopped server")
+    println("stopped module registry server")
   }
 
   private def getWebPath() = System.getProperty("user.dir") + "/web"
@@ -347,6 +346,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     val tempUUID = java.util.UUID.randomUUID()
     val tempFile = "module-" + tempUUID + ".tmp.zip"
     val dirName = "module-" + tempUUID + ".tmp"
+
     for {
       file <- open(tempFile)
       zip <- download(url, file)
