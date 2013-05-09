@@ -3,12 +3,12 @@ package com.campudus.vertxmoduleregistry
 import scala.concurrent.{ Future, Promise }
 import org.vertx.java.core.AsyncResult
 import org.vertx.java.core.json.JsonObject
-import org.vertx.java.platform.Verticle
 import com.campudus.vertx.helpers.VertxScalaHelpers
 import com.campudus.vertxmoduleregistry.database.Database
 import com.campudus.vertxmoduleregistry.security.Authentication
 import org.vertx.java.core.AsyncResultHandler
 import org.vertx.java.core.Handler
+import com.campudus.vertx.Verticle
 
 class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
@@ -19,7 +19,6 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
   val serverVerticle = "com.campudus.vertxmoduleregistry.ModuleRegistryServer"
 
   override def start() {
-    implicit val ec = scala.concurrent.ExecutionContext.global
     lazy val logger = container.logger()
 
     logger.error("Starting module registry ...")
@@ -35,27 +34,14 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
     println("deploying all modules with " + config)
 
-    val ctx = vertx.currentContext()
-
     deployModule(mongoPersistorModName, configDb)
       .map(id => println("deployed mongo persistor with id: " + id))
       .flatMap(_ => deployModule(authManagerModName, configAuth))
       .map(id => println("deployed auth manager with id: " + id))
       .flatMap(_ => deployModule(unzipModName, configUnzip))
       .map(id => println("deployed unzip module with id: " + id))
-      .map { _ =>
-        println("modules should be deployed now, deploying verticle")
-        ctx.runOnContext({ () =>
-          container.deployVerticle(serverVerticle, config, { deployResult: AsyncResult[String] =>
-            if (deployResult.succeeded()) {
-              println("started " + serverVerticle + " with config " + config)
-            } else {
-              println("failed to start " + serverVerticle + " because of " + deployResult.cause())
-              deployResult.cause().printStackTrace()
-            }
-          })
-        })
-      }
+      .flatMap(_ => deployVerticle(serverVerticle, config))
+      .map(id => println("deployed verticle with id: " + id))
 
     println("Modules should deploy async now.")
 

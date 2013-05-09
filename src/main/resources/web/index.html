@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Vert.x Module Registry</title>
+<link rel="stylesheet" type="text/css" href="/css/normalize.css" />
+<link rel="stylesheet" type="text/css" href="/css/main.css" />
+<link rel="stylesheet" type="text/css" href="/css/flick/jquery-ui-1.10.2.custom.css" />
+<script src="js/jquery-1.9.1.js" type="text/javascript"></script>
+<script src="js/jquery-ui-1.10.2.custom.min.js" type="text/javascript"></script>
+<script src="js/init.js" type="text/javascript"></script>
+</head>
+<body id="container">
+	<div id="container">
+		<div id="loginContainer">
+			<a class="close href-less"><img src="images/close.png" /></a>
+			<form id="loginForm" method="post" action="/login">
+				<fieldset>
+					<label> <span>Password</span> <input id="password" type="password"
+						placeholder="Password" value="" name="password">
+					</label>
+					<button type="submit">Login</button>
+					<span class="errorMessage">error</span>
+				</fieldset>
+			</form>
+		</div>
+		<div id="header">
+			<h1>
+				<span class="head">Vert.x Module Registry</span>
+			</h1>
+		</div>
+		<div id="main">
+			<div class="intro">
+				<p>This is the Vert.x module registry. Here you can find all modules published by Vert.x
+					users.</p>
+			</div>
+			<div id="search">
+				<h2>Search</h2>
+				<div id="searchForModules">
+					<form action="/search" method="post" id="searchForm">
+						<fieldset>
+							<legend>Search for modules</legend>
+							<div>
+								<input type="text" name="query" placeholder="Query for modules" id="query" />
+							</div>
+							<button type="submit">Search</button>
+						</fieldset>
+					</form>
+				</div>
+				<div id="searchResultContainer">
+					<h2>Search results</h2>
+					<div id="searchResults"></div>
+				</div>
+			</div>
+			<div class="col left">
+				<div id="latest" class="topic">
+					<h3>Latest approved modules</h3>
+					<div id="latestApprovedModules"></div>
+				</div>
+				<div id="unapproved" class="topic">
+					<h3>Unapproved modules</h3>
+					<p>
+						<a class="showUnapproved href-less">[Show]</a>
+					</p>
+					<div id="unapprovedModules"></div>
+					<div id="dialogConfirmApprove" title="Approve module?" style="display: none;">
+						<p>Do you really want to approve this module?</p>
+					</div>
+					<div id="dialogConfirmDeny" title="Deny module?" style="display: none;">
+						<p>Do you really want to deny and remove this module?</p>
+					</div>
+				</div>
+			</div>
+
+			<div class="col right">
+				<div class="topic">
+					<h3>You should also visit</h3>
+					<ul>
+						<li><a href="http://vertx.io/"><img src="images/vertx.png" alt="GitHub" /></a></li>
+						<li><a href="http://campudus.com"><img src="images/campudus.png" alt="Campudus" /></a></li>
+						<li><a href="https://github.com/"><img src="images/github.png" alt="GitHub" /></a></li>
+					</ul>
+				</div>
+			</div>
+			<div id="register">
+				<h2>Register your own module</h2>
+				<div class="intro">
+					<p>
+						To register your own module, simply fill out the <a class="showRegister href-less"
+							href="/register">registration form</a>.
+					</p>
+				</div>
+				<div id="registerFormContainer">
+					<p>Please fill in the fields and submit your module. You'll need to wait for a moderator to
+						approve your module. Feel free to ping us in IRC on Freenode.</p>
+					<form id="registerForm" action="/register" method="POST">
+						<div class="columns">
+							<div class="col left">
+								<fieldset class="reginfo">
+									<legend>Module information</legend>
+									<label for="downloadUrl"><span>Download URL</span> <input type="url"
+										name="downloadUrl" placeholder="Download URL for this module" required="required" /> </label>
+								</fieldset>
+							</div>
+						</div>
+						<button type="submit">Submit for moderation</button>
+					</form>
+				</div>
+			</div>
+		</div>
+		<div id="footer">
+			<p>
+				Made with aid of <span class="randomName">marvelous bananas</span> at <a
+					href="http://campudus.com">Campudus</a>
+			</p>
+		</div>
+	</div>
+</body>
+</html>

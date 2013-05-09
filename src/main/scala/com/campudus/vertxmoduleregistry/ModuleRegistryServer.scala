@@ -2,13 +2,11 @@ package com.campudus.vertxmoduleregistry
 
 import java.net.URL
 import java.net.URLDecoder
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.util.Failure
 import scala.util.Success
-
 import org.vertx.java.core.AsyncResult
 import org.vertx.java.core.Vertx
 import org.vertx.java.core.buffer.Buffer
@@ -17,13 +15,12 @@ import org.vertx.java.core.http.HttpServerRequest
 import org.vertx.java.core.http.RouteMatcher
 import org.vertx.java.core.json.JsonArray
 import org.vertx.java.core.json.JsonObject
-import org.vertx.java.platform.Verticle
-
 import com.campudus.vertx.helpers.PostRequestReader
 import com.campudus.vertx.helpers.VertxFutureHelpers
 import com.campudus.vertx.helpers.VertxScalaHelpers
 import com.campudus.vertxmoduleregistry.database.Database._
 import com.campudus.vertxmoduleregistry.security.Authentication._
+import com.campudus.vertx.Verticle
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
 
@@ -65,13 +62,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
   override def start() {
     println("starting module registry")
+    val logger = container.logger()
     val rm = new RouteMatcher
 
-    rm.get("/", { req: HttpServerRequest =>
-      req.response.sendFile(getWebPath() + "/index.html")
+    rm.get("/", { implicit req: HttpServerRequest =>
+      deliver(getWebPath() + "/index.html")
     })
-    rm.get("/register", { req: HttpServerRequest =>
-      req.response.sendFile(getWebPath() + "/register.html")
+    rm.get("/register", { implicit req: HttpServerRequest =>
+      deliver(getWebPath() + "/register.html")
     })
 
     rm.get("/latest-approved-modules", {
@@ -291,8 +289,10 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
                 vertx.fileSystem().exists(indexFile, {
                   exists: AsyncResult[java.lang.Boolean] =>
                     if (exists.succeeded() && exists.result) {
+                      logger.error("sending " + indexFile)
                       deliver(indexFile)
                     } else {
+                      logger.error("could not find " + indexFile)
                       deliver(404, errorDir + "/404.html")
                     }
                 })
@@ -300,6 +300,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
                 deliver(path)
               }
             } else {
+              logger.error("could not find " + path)
               deliver(404, errorDir + "/404.html")
             }
         })
@@ -322,7 +323,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     println("stopped module registry server")
   }
 
-  private def getWebPath() = System.getProperty("user.dir") + "/web"
+  private def getWebPath() = "web"
 
   private def trimSlashes(path: String) = {
     path.replace("^/+", "").replace("/+$", "")
