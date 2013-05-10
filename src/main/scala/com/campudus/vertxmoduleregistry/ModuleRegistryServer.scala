@@ -1,28 +1,24 @@
 package com.campudus.vertxmoduleregistry
 
-import java.net.URL
-import java.net.URLDecoder
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.Promise
-import scala.util.Failure
-import scala.util.Success
-import org.vertx.java.core.AsyncResult
-import org.vertx.java.core.Vertx
+import java.io.File
+import java.net.{ URI, URLDecoder }
+import scala.concurrent.{ Future, Promise }
+import scala.util.{ Failure, Success }
+import org.vertx.java.core.{ AsyncResult, Vertx }
 import org.vertx.java.core.buffer.Buffer
 import org.vertx.java.core.file.FileProps
-import org.vertx.java.core.http.HttpServerRequest
-import org.vertx.java.core.http.RouteMatcher
-import org.vertx.java.core.json.JsonArray
-import org.vertx.java.core.json.JsonObject
-import com.campudus.vertx.helpers.PostRequestReader
-import com.campudus.vertx.helpers.VertxFutureHelpers
-import com.campudus.vertx.helpers.VertxScalaHelpers
-import com.campudus.vertxmoduleregistry.database.Database._
-import com.campudus.vertxmoduleregistry.security.Authentication._
+import org.vertx.java.core.http.{ HttpServerRequest, RouteMatcher }
+import org.vertx.java.core.json.{ JsonArray, JsonObject }
 import com.campudus.vertx.Verticle
+import com.campudus.vertx.helpers.{ PostRequestReader, VertxFutureHelpers, VertxScalaHelpers }
+import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, registerModule, searchModules, unapproved }
+import com.campudus.vertxmoduleregistry.security.Authentication.{ authorise, login, logout }
+import scala.util.Failure
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
+  import com.campudus.vertx.DefaultVertxExecutionContext._
+
+  val FILE_SEP = File.separator
 
   private def getRequiredParam(param: String, error: String)(implicit paramMap: Map[String, String], errors: collection.mutable.ListBuffer[String]) = {
     def addError() = {
@@ -48,8 +44,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     p.future
   }
 
-  private def respondFailed(message: String)(implicit request: HttpServerRequest) =
-    request.response.end(json.putString("status", "failed").putString("message", message).encode)
+  private def respondFailed(message: String)(implicit request: HttpServerRequest) = {
+    request.response().setStatusCode(400)
+    request.response.putHeader("Set-Cookie", "lasterror=" + message + ";")
+    request.response.sendFile(getWebPath + FILE_SEP + "errors" + FILE_SEP + "400.html")
+  }
 
   private def respondErrors(messages: List[String])(implicit request: HttpServerRequest) = {
     val errorsAsJsonArr = new JsonArray
@@ -62,7 +61,6 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
   override def start() {
     println("starting module registry")
-    val logger = container.logger()
     val rm = new RouteMatcher
 
     rm.get("/", { implicit req: HttpServerRequest =>
@@ -191,26 +189,38 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     rm.post("/register", {
       implicit req: HttpServerRequest =>
         val buf = new Buffer(0)
-        req.dataHandler({ buffer: Buffer => buf.appendBuffer(buffer) })
+        println("post to /register")
+
+        req.dataHandler({ buffer: Buffer =>
+          println("data into buffer...")
+          buf.appendBuffer(buffer)
+        })
         req.endHandler({ () =>
+          println("end handler of buffer!")
+
           implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
           implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
           try {
-            val downloadUrl = new URL(getRequiredParam("downloadUrl", "Download URL missing"))
-            for {
+            val downloadUrl = new URI(getRequiredParam("downloadUrl", "Download URL missing"))
+
+            (for {
               module <- downloadExtractAndRegister(downloadUrl)
-            } {
-              registerModule(vertx, module) onComplete {
-                case Success(json) =>
-                  req.response.setChunked(true)
-                  req.response.write("Registered: " + module + " with id " + json.getString("_id"))
-                  req.response.end("<a href=\"/\">Back to module registry</a>")
-                case Failure(error) => respondFailed(error.getMessage())
-              }
+              json <- registerModule(vertx, module)
+            } yield {
+              (module, json)
+            }) onComplete {
+              case Success((module, json)) =>
+                req.response.setChunked(true)
+                req.response.write("Registered: " + module + " with id " + json.getString("_id"))
+                req.response.end("<a href=\"/\">Back to module registry</a>")
+              case Failure(error) =>
+                respondFailed(error.getMessage())
             }
           } catch {
-            case e: Exception => errorBuffer.append("Download URL could not be parsed")
+            case e: Exception =>
+              req.response().end("Download URL could not be parsed: " + e.getMessage())
+              errorBuffer.append("Download URL could not be parsed")
           }
         })
 
@@ -343,21 +353,26 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     }
   }
 
-  private def downloadExtractAndRegister(url: URL): Future[Module] = {
+  private def downloadExtractAndRegister(uri: URI): Future[Module] = {
     val tempUUID = java.util.UUID.randomUUID()
     val tempFile = "module-" + tempUUID + ".tmp.zip"
-    val dirName = "module-" + tempUUID + ".tmp"
+    val absPath = new File(tempFile).getAbsolutePath()
 
     for {
-      file <- open(tempFile)
-      zip <- download(url, file)
-      tempDir <- createDir(dirName)
-      _ <- extract(zip, dirName)
-      modJson <- open(dirName + "/mod.json") if (tempDir)
-      content <- fileToString(modJson)
+      file <- open(absPath)
+      downloadedFile <- downloadInto(uri, file)
+      destDir <- extract(absPath)
+      modFileName <- modFileNameFromExtractedModule(destDir)
+      modJson <- open(modFileName + FILE_SEP + "mod.json")
+      content <- readFileToString(modJson)
     } yield {
-      val json = new JsonObject(content)
-      Module.fromJson(json.putNumber("timeRegistered", System.currentTimeMillis())).get
+      println("got mod.json:\n" + content.toString())
+      val json = new JsonObject(content.toString())
+      println("in json:\n" + json.encode())
+      Module.fromJson(json.putNumber("timeRegistered", System.currentTimeMillis())) match {
+        case Some(module) => module
+        case None => throw new RuntimeException("cannot read module information from mod.json - fields missing?")
+      }
     }
   }
 }

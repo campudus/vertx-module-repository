@@ -11,12 +11,7 @@ import org.vertx.java.core.Handler
 import com.campudus.vertx.Verticle
 
 class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
-
-  val mongoPersistorModName = "io.vertx~mod-mongo-persistor~2.0.0-SNAPSHOT"
-  val authManagerModName = "io.vertx~mod-auth-mgr~2.0.0-SNAPSHOT"
-  val unzipModName = "io.vertx~mod-unzip~1.0.0-SNAPSHOT"
-  val unzipAddress = "io.vertx.unzipper"
-  val serverVerticle = "com.campudus.vertxmoduleregistry.ModuleRegistryServer"
+  import ModuleRegistryStarter._
 
   override def start() {
     lazy val logger = container.logger()
@@ -83,4 +78,12 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
     })
     p.future
   }
+}
+
+object ModuleRegistryStarter {
+  val mongoPersistorModName = "io.vertx~mod-mongo-persistor~2.0.0-SNAPSHOT"
+  val authManagerModName = "io.vertx~mod-auth-mgr~2.0.0-SNAPSHOT"
+  val unzipModName = "io.vertx~mod-unzip~1.0.0-SNAPSHOT"
+  val unzipAddress = "io.vertx.unzipper"
+  val serverVerticle = "com.campudus.vertxmoduleregistry.ModuleRegistryServer"
 }

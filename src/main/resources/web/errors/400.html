@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>400 - Vert.x Module Registry</title>
+<style type="text/css">
+body {
+	color: #445561;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.9em;
+	background-color: #ddd;
+}
+</style>
+</head>
+<body>
+	<h1>Error 400 - Bad Request</h1>
+	<p>Could not handle the provided link to your module. This may happen due to the following
+		reasons:</p>
+	<ul>
+		<li>The link you provided is broken</li>
+		<li>The zip-Archive is corrupted</li>
+		<li>The structure of the zip-Archive is not recognized. Does the module contain a directory
+			with the same name as the module itself? Does this directory contain the mod.json file?</li>
+		<li>The mod.json does not contain all required fields. Please see the Vert.x manual how the
+			mod.json has to be structured.</li>
+	</ul>
+	<h2>Information provided by server</h2>
+	<div id="serverMessage"></div>
+	<script>
+    var serverMsg = document.getElementById('serverMessage');
+    try {
+      serverMsg.innerHTML = document.cookie.split(';')[0].split('=')[1];
+    } catch (e) {
+      serverMsg.innerHTML = 'No message from server could be read out.';
+    }
+  </script>
+</body>
+</html>

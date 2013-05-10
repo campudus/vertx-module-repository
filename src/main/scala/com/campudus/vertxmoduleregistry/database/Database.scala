@@ -6,7 +6,7 @@ import org.vertx.java.core.Vertx
 import org.vertx.java.core.eventbus.Message
 import com.campudus.vertx.helpers.VertxScalaHelpers
 import scala.concurrent.Promise
-import scala.concurrent._
+import scala.concurrent.Future
 import java.util.UUID
 
 object Database extends VertxScalaHelpers {

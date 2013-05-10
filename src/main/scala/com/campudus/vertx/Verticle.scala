@@ -1,12 +1,7 @@
 package com.campudus.vertx
 
-class Verticle extends org.vertx.java.platform.Verticle {
+trait Verticle extends org.vertx.java.platform.Verticle with VertxExecutionContext {
 
-  lazy val logger = container.logger()
-
-  implicit val ec = new scala.concurrent.ExecutionContext() {
-    def execute(runnable: Runnable): Unit = runnable.run()
-    def reportFailure(t: Throwable): Unit = logger.error("problem: " + t)
-  }
+  lazy val logger = getContainer().logger()
 
 }
