@@ -104,7 +104,7 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
       if (ar.succeeded()) {
         val listOfEntries = ar.result.toList
         println("read stuff from dir: " + listOfEntries)
-        promise.success(listOfEntries.head)
+        promise.success(listOfEntries.filter(_.endsWith("mod.json")).head)
       } else {
         promise.failure(new RuntimeException(ar.cause))
       }

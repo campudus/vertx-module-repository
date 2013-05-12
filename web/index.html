@@ -89,6 +89,14 @@
 							href="/register">registration form</a>.
 					</p>
 				</div>
+				<div class="error">
+					<h3>Could not register module!</h3>
+					<p class="message">No info from server.</p>
+				</div>
+				<div class="info">
+					<h3>Module successfully registered!</h3>
+					<p class="message">No info from server.</p>
+				</div>
 				<div id="registerFormContainer">
 					<p>Please fill in the fields and submit your module. You'll need to wait for a moderator to
 						approve your module. Feel free to ping us in IRC on Freenode.</p>
@@ -98,11 +106,18 @@
 								<fieldset class="reginfo">
 									<legend>Module information</legend>
 									<label for="downloadUrl"><span>Download URL</span> <input type="url"
-										name="downloadUrl" placeholder="Download URL for this module" required="required" /> </label>
+										id="registerFormDownloadUrl" name="downloadUrl" placeholder="Download URL for this module"
+										required="required" /> </label>
+								</fieldset>
+							</div>
+							<div class="col right">
+								<fieldset class="reginfo">
+									<legend>Additional information</legend>
+									...nothing needed yet.
 								</fieldset>
 							</div>
 						</div>
-						<button type="submit">Submit for moderation</button>
+						<button id="registerButton" type="submit">Submit for moderation</button>
 					</form>
 				</div>
 			</div>

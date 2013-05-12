@@ -46,8 +46,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
   private def respondFailed(message: String)(implicit request: HttpServerRequest) = {
     request.response().setStatusCode(400)
-    request.response.putHeader("Set-Cookie", "lasterror=" + message + ";")
-    request.response.sendFile(getWebPath + FILE_SEP + "errors" + FILE_SEP + "400.html")
+    request.response.end(s"""{"status":"error","message":"${message}"}""")
   }
 
   private def respondErrors(messages: List[String])(implicit request: HttpServerRequest) = {
@@ -64,10 +63,10 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     val rm = new RouteMatcher
 
     rm.get("/", { implicit req: HttpServerRequest =>
-      deliver(getWebPath() + "/index.html")
+      deliver(webPath + FILE_SEP + "index.html")
     })
     rm.get("/register", { implicit req: HttpServerRequest =>
-      deliver(getWebPath() + "/register.html")
+      deliver(webPath + FILE_SEP + "register.html")
     })
 
     rm.get("/latest-approved-modules", {
@@ -211,11 +210,8 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
               (module, json)
             }) onComplete {
               case Success((module, json)) =>
-                req.response.setChunked(true)
-                req.response.write("Registered: " + module + " with id " + json.getString("_id"))
-                req.response.end("<a href=\"/\">Back to module registry</a>")
-              case Failure(error) =>
-                respondFailed(error.getMessage())
+                req.response.end(s"""{"status":"ok","data":${module.toJson}}""")
+              case Failure(error) => respondFailed(error.getMessage())
             }
           } catch {
             case e: Exception =>
@@ -284,18 +280,18 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
       } else {
         param0
       }
-      val errorDir = getWebPath() + "/errors"
+      val errorDir = webPath + FILE_SEP + "errors"
 
       if (param.contains("..")) {
         deliver(403, errorDir + "403.html")
       } else {
-        val path = getWebPath() + param
+        val path = webPath + param
 
         vertx.fileSystem().props(path, {
           fprops: AsyncResult[FileProps] =>
             if (fprops.succeeded()) {
               if (fprops.result.isDirectory) {
-                val indexFile = path + "/index.html"
+                val indexFile = path + FILE_SEP + "index.html"
                 vertx.fileSystem().exists(indexFile, {
                   exists: AsyncResult[java.lang.Boolean] =>
                     if (exists.succeeded() && exists.result) {
@@ -303,7 +299,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
                       deliver(indexFile)
                     } else {
                       logger.error("could not find " + indexFile)
-                      deliver(404, errorDir + "/404.html")
+                      deliver(404, errorDir + FILE_SEP + "404.html")
                     }
                 })
               } else {
@@ -311,7 +307,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
               }
             } else {
               logger.error("could not find " + path)
-              deliver(404, errorDir + "/404.html")
+              deliver(404, errorDir + FILE_SEP + "404.html")
             }
         })
       }
@@ -323,7 +319,8 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
     println("host: " + host)
     println("port: " + port)
-    println("webpath: " + getWebPath())
+    println("this path: " + new File(".").getAbsolutePath())
+    println("webpath: " + webPath)
 
     vertx.createHttpServer().requestHandler(rm).listen(port.intValue(), host);
     println("started module registry server")
@@ -333,7 +330,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     println("stopped module registry server")
   }
 
-  private def getWebPath() = "web"
+  lazy val webPath = (new File(".")).getAbsolutePath() + FILE_SEP + "web"
 
   private def trimSlashes(path: String) = {
     path.replace("^/+", "").replace("/+$", "")
@@ -347,7 +344,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
   private def deliverValidUrl(file: String)(implicit request: HttpServerRequest) {
     if (file.contains("..")) {
-      deliver(403, "errors/403.html")
+      deliver(403, "errors" + FILE_SEP + "403.html")
     } else {
       deliver(file)
     }
@@ -363,13 +360,13 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
       downloadedFile <- downloadInto(uri, file)
       destDir <- extract(absPath)
       modFileName <- modFileNameFromExtractedModule(destDir)
-      modJson <- open(modFileName + FILE_SEP + "mod.json")
+      modJson <- open(modFileName)
       content <- readFileToString(modJson)
     } yield {
       println("got mod.json:\n" + content.toString())
-      val json = new JsonObject(content.toString())
+      val json = new JsonObject(content.toString()).putString("downloadUrl", uri.toString())
       println("in json:\n" + json.encode())
-      Module.fromJson(json.putNumber("timeRegistered", System.currentTimeMillis())) match {
+      Module.fromModJson(json.putNumber("timeRegistered", System.currentTimeMillis())) match {
         case Some(module) => module
         case None => throw new RuntimeException("cannot read module information from mod.json - fields missing?")
       }

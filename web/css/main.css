@@ -254,6 +254,14 @@ p {
 	margin: 38px 0 30px 0;
 }
 
+#register .info {
+	display: none;
+}
+
+#register .error {
+	display: none;
+}
+
 #register #registerFormContainer {
 	display: none;
 }

@@ -29,7 +29,7 @@ function formatTimestamp(time) {
   }
 
   var date = new Date(time);
-  var months = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
+  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var year = date.getFullYear();
   var month = months[date.getMonth()];
   var day = date.getDate();
@@ -46,7 +46,7 @@ function createSearchFormSubmitHandler() {
   $('#searchForm').submit(function(event) {
     event.preventDefault();
     $.post('/search', {
-      query : $('#query').val()
+      query: $('#query').val()
     }, function(data) {
       $('#searchResults').empty();
       if ($.isEmptyObject(data.modules)) {
@@ -60,7 +60,6 @@ function createSearchFormSubmitHandler() {
 }
 
 function createRegisterFormHandler() {
-  $('a.showRegister').click(showRegisterForm);
   function showRegisterForm() {
     $('#registerFormContainer').show();
     displayHideLink();
@@ -79,6 +78,40 @@ function createRegisterFormHandler() {
     $('a.hideRegister').replaceWith('<a class="showRegister href-less">registration form</a>')
     $('a.showRegister').click(showRegisterForm);
   }
+
+  function showInfoMessage(message) {
+    $('#register .error').hide();
+    $('#register .info').show();
+    $('#register .info .message').text(message);
+  }
+
+  function showErrorMessage(message) {
+    $('#register .info').hide();
+    $('#register .error').show();
+    $('#register .error .message').text(message);
+  }
+
+  function processRegisterResult(json) {
+    $('#registerButton').attr('disabled', false);
+    $('#registerButton').text('Submit for moderation');
+    if (json.status == 'ok') {
+      showInfoMessage(JSON.stringify(json.data));
+    } else if (json.status == 'error') {
+      showErrorMessage(json.message);
+    }
+  }
+
+  $('a.showRegister').click(showRegisterForm);
+  $('#registerForm .message').hide();
+
+  $('#registerForm').submit(function(event) {
+    event.preventDefault();
+    $('#registerButton').attr('disabled', true);
+    $('#registerButton').text('Checking validity of module...');
+    $.post('/register', {
+      downloadUrl: $('#registerFormDownloadUrl').val()
+    }, processRegisterResult, 'json');
+  });
 }
 
 function createUnapprovedModsHandler() {
@@ -113,8 +146,8 @@ function createUnapprovedModsHandler() {
     var margLeft = $(loginContainer).width() / 2;
 
     $(loginContainer).css({
-      'margin-top' : -margTop,
-      'margin-left' : -margLeft
+      'margin-top': -margTop,
+      'margin-left': -margLeft
     });
 
     // Add mask to hide the background
@@ -148,7 +181,7 @@ function createUnapprovedModsHandler() {
   $('#loginForm').submit(function(event) {
     event.preventDefault();
     $.post('/login', {
-      password : $('#password').val()
+      password: $('#password').val()
     }, processLoginResult, 'json');
   });
 
@@ -167,7 +200,7 @@ function createUnapprovedModsHandler() {
 
   function getUnapproved() {
     $.getJSON('/unapproved', {
-      sessionID : sid
+      sessionID: sid
     }, function(data) {
       if (data.modules) {
         $('#unapprovedModules').empty();
@@ -197,14 +230,14 @@ function createUnapprovedModsHandler() {
       var modId = $(mod).attr('id');
 
       $("#dialogConfirmApprove").dialog({
-        resizable : false,
-        modal : true,
-        buttons : {
-          "Yes, I'm sure!" : function() {
+        resizable: false,
+        modal: true,
+        buttons: {
+          "Yes, I'm sure!": function() {
             $(this).dialog("close");
             approve(modId);
           },
-          Cancel : function() {
+          Cancel: function() {
             $(this).dialog("close");
           }
         }
@@ -220,14 +253,14 @@ function createUnapprovedModsHandler() {
       var modId = $(mod).attr('id');
 
       $("#dialogConfirmDeny").dialog({
-        resizable : false,
-        modal : true,
-        buttons : {
-          "Yes, I'm sure!" : function() {
+        resizable: false,
+        modal: true,
+        buttons: {
+          "Yes, I'm sure!": function() {
             $(this).dialog("close");
             deny(modId);
           },
-          Cancel : function() {
+          Cancel: function() {
             $(this).dialog("close");
           }
         }
@@ -250,15 +283,10 @@ function createUnapprovedModsHandler() {
     // }, 'json');
   }
 
-  function processApproveResult(json) {
-
-    // TODO
-  }
-
   function approve(modId) {
     $.post('/approve', {
-      sessionID : sid,
-      _id : modId
+      sessionID: sid,
+      _id: modId
     }, function(data) {
       processApproveResult(data)
     }, 'json');
@@ -298,14 +326,14 @@ function createUnapprovedModsHandler() {
 }
 
 function generateName() {
-  var nameA = [ "awesome", "amazing", "fantastic", "marvelous", "storming", "staggering",
+  var nameA = ["awesome", "amazing", "fantastic", "marvelous", "storming", "staggering",
       "exciting", "mind-blowing", "astonishing", "handsome", "beautiful", "admirable", "lovely",
       "gorgeous", "exceptional", "uncommon", "terribly nice", "outstanding", "fine-looking",
       "well-favored", "glorious", "pulchritudinous", "ravishing", "stunning", "dazzling",
-      "mind-boggling", "attractive", "graceful", "pleasing", "charismatic", "enchanting" ];
-  var nameB = [ "men", "guys", "dudes", "fellows", "jossers", "wallahs", "blokes", "fellas",
+      "mind-boggling", "attractive", "graceful", "pleasing", "charismatic", "enchanting"];
+  var nameB = ["men", "guys", "dudes", "fellows", "jossers", "wallahs", "blokes", "fellas",
       "fellers", "chaps", "lads", "people", "humans", "geezers", "boys", "gorillas", "bananas",
-      "champs", "rockers", "pals" ];
+      "champs", "rockers", "pals"];
   var a = Math.floor(Math.random() * nameA.length);
   var b = Math.floor(Math.random() * nameB.length);
   var name = nameA[a] + ' ' + nameB[b];
