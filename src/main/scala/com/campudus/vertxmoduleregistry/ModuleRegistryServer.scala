@@ -353,9 +353,9 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     println("in send mail")
     val mailerConf = container.config().getObject("mailer", json)
     println("mailerConf: " + mailerConf)
-    val email = Option(mailerConf.getString("infoMail", System.getenv("VERTX_MODULE_MAIL")))
+    val email = Option(mailerConf.getString("infoMail"))
     println("email: " + email)
-    val moderators = Option(mailerConf.getArray("moderators", new JsonArray().addString(System.getenv("VERTX_MODULE_MAIL"))))
+    val moderators = Option(mailerConf.getArray("moderators"))
     println("moderators: " + moderators)
 
     if (email.isDefined && moderators.isDefined) {
