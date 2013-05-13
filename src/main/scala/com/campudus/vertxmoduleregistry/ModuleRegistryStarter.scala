@@ -21,6 +21,8 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
     val config = Option(container.config()).getOrElse(new JsonObject)
     val configDb = config.getObject("database", new JsonObject)
       .putString("address", Database.dbAddress)
+    val configMailer = config.getObject("mailer", new JsonObject)
+      .putString("address", mailerAddress)
     val configAuth = config.getObject("auth", new JsonObject)
       .putString("persistor_address", Database.dbAddress)
       .putString("address", Authentication.authAddress)
@@ -31,6 +33,8 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
     deployModule(mongoPersistorModName, configDb)
       .map(id => println("deployed mongo persistor with id: " + id))
+      .flatMap(_ => deployModule(mailerModName, configMailer))
+      .map(id => println("deployed mailer with id: " + id))
       .flatMap(_ => deployModule(authManagerModName, configAuth))
       .map(id => println("deployed auth manager with id: " + id))
       .flatMap(_ => deployModule(unzipModName, configUnzip))
@@ -82,6 +86,8 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
 object ModuleRegistryStarter {
   val mongoPersistorModName = "io.vertx~mod-mongo-persistor~2.0.0-SNAPSHOT"
+  val mailerModName = "io.vertx~mod-mailer~2.0.0-SNAPSHOT"
+  val mailerAddress = "io.vertx.mailer"
   val authManagerModName = "io.vertx~mod-auth-mgr~2.0.0-SNAPSHOT"
   val unzipModName = "io.vertx~mod-unzip~1.0.0-SNAPSHOT"
   val unzipAddress = "io.vertx.unzipper"

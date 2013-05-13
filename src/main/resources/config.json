@@ -8,6 +8,16 @@
       "username":"<MONGO_USER>",
       "password":"<MONGO_PASS>"
    },
+   "mailer":{
+      "host":<MAILER_HOST>,
+      "port":<MAILER_HOST>,
+      "ssl":true,
+      "auth":true,
+      "username":<MAILER_USER>,
+      "password":<MAILER_PASS>,
+      "infoMail":<MAILER_MAIL>,
+      "moderators":<MODERATOR_MAILS>
+   },
    "auth":{
       "user_collection":"users",
       "session_timeout": 1800000

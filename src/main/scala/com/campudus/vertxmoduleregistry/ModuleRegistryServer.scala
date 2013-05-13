@@ -14,6 +14,7 @@ import com.campudus.vertx.helpers.{ PostRequestReader, VertxFutureHelpers, Vertx
 import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, registerModule, searchModules, unapproved }
 import com.campudus.vertxmoduleregistry.security.Authentication.{ authorise, login, logout }
 import scala.util.Failure
+import org.vertx.java.core.eventbus.Message
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
   import com.campudus.vertx.DefaultVertxExecutionContext._
@@ -175,11 +176,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
               case Success(modules) =>
                 val modulesArray = new JsonArray()
                 modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
-                req.response.end(json.putArray("modules", modulesArray).encode)
+                req.response.end(json.putString("status", "ok").putArray("modules", modulesArray).encode)
               case Failure(error) => respondFailed(error.getMessage())
             }
           } else {
-            req.response.end
+            respondErrors(errors)
           }
         })
     })
@@ -199,56 +200,32 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
           implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
           implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
-          try {
-            val downloadUrl = new URI(getRequiredParam("downloadUrl", "Download URL missing"))
-
-            (for {
-              module <- downloadExtractAndRegister(downloadUrl)
-              json <- registerModule(vertx, module)
-            } yield {
-              (module, json)
-            }) onComplete {
-              case Success((module, json)) =>
-                req.response.end(s"""{"status":"ok","data":${module.toJson}}""")
-              case Failure(error) => respondFailed(error.getMessage())
-            }
-          } catch {
-            case e: Exception =>
-              req.response().end("Download URL could not be parsed: " + e.getMessage())
-              errorBuffer.append("Download URL could not be parsed")
-          }
-        })
-
-      /*
-          val name = getRequiredParam("modname", "Missing name")
-          val owner = getRequiredParam("modowner", "Missing owner")
-          val version = getRequiredParam("version", "Missing version of module")
-          val vertxVersion = getRequiredParam("vertxVersion", "Missing vertx version")
-          val description = getRequiredParam("description", "Missing description")
-          val projectUrl = getRequiredParam("projectUrl", "Missing project URL")
-          val author = getRequiredParam("author", "Missing author")
-          val email = getRequiredParam("email", "Missing contact email")
-          val license = getRequiredParam("license", "Missing license")
-          val keywords = paramMap.get("keywords") match {
-            case None => List()
-            case Some(words) => URLDecoder.decode(words, "utf-8").split("\\s*,\\s*").toList
-          }
+          val url = getRequiredParam("downloadUrl", "Download URL missing")
 
           val errors = errorBuffer.result
           if (errors.isEmpty) {
-            val module = Module(downloadUrl, name, owner, version, vertxVersion, description, projectUrl, author, email, license, keywords, System.currentTimeMillis())
+            try {
+              val downloadUrl = new URI(url)
 
-            registerModule(vertx, module) onComplete {
-              case Success(json) =>
-                req.response.setChunked(true)
-                req.response.write("Registered: " + module + " with id " + json.getString("_id"))
-                req.response.end("<a href=\"/\">Back to module registry</a>")
-              case Failure(error) => respondFailed(error.getMessage())
+              (for {
+                module <- downloadExtractAndRegister(downloadUrl)
+                json <- registerModule(vertx, module)
+                sent <- sendMailToModerators(module)
+              } yield {
+                (module, json, sent)
+              }) onComplete {
+                case Success((module, json, sent)) =>
+                  req.response.end(s"""{"status":"ok","mailSent":${sent},"data":${module.toSensibleJson.encode()}}""")
+                case Failure(error) => respondFailed(error.getMessage())
+              }
+            } catch {
+              case e: Exception =>
+                respondFailed("Download URL could not be parsed" + e.getMessage())
             }
           } else {
             respondErrors(errors)
           }
-        }) */
+        })
     })
 
     rm.post("/logout", {
@@ -369,6 +346,37 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
         case Some(module) => module
         case None => throw new RuntimeException("cannot read module information from mod.json - fields missing?")
       }
+    }
+  }
+
+  private def sendMailToModerators(mod: Module): Future[Boolean] = {
+    println("in send mail")
+    val mailerConf = container.config().getObject("mailer", json)
+    println("mailerConf: " + mailerConf)
+    val email = Option(mailerConf.getString("infoMail", System.getenv("VERTX_MODULE_MAIL")))
+    println("email: " + email)
+    val moderators = Option(mailerConf.getArray("moderators", new JsonArray().addString(System.getenv("VERTX_MODULE_MAIL"))))
+    println("moderators: " + moderators)
+
+    if (email.isDefined && moderators.isDefined) {
+      val data = json
+        .putString("from", email.get)
+        .putArray("to", moderators.get)
+        .putString("subject", "New module waiting for approval: " + mod.name)
+        .putString("body", mod.toWaitForApprovalEmailString())
+
+      val promise = Promise[Boolean]
+      vertx.eventBus.send(ModuleRegistryStarter.mailerAddress, data, { msg: Message[JsonObject] =>
+        logger.info("mailed something and received: " + msg.body.encode())
+        if ("ok" == msg.body.getString("status")) {
+          promise.success(true)
+        } else {
+          promise.success(false)
+        }
+      })
+      promise.future
+    } else {
+      Future.successful(false)
     }
   }
 }

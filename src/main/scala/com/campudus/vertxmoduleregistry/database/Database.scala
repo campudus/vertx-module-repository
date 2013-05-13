@@ -50,7 +50,16 @@ object Database extends VertxScalaHelpers {
     id: String = UUID.randomUUID.toString) {
 
     def toJson(): JsonObject = {
-      val js = json.putString("_id", id)
+      val js = toSensibleJson.putString("_id", id)
+        .putNumber("timeRegistered", timeRegistered)
+        .putNumber("timeApproved", timeApproved)
+        .putBoolean("approved", approved)
+
+      js
+    }
+
+    def toSensibleJson(): JsonObject = {
+      val js = json
         .putString("downloadUrl", downloadUrl)
         .putString("name", name)
         .putString("description", description)
@@ -58,15 +67,28 @@ object Database extends VertxScalaHelpers {
         .putString("projectUrl", projectUrl)
         .putArray("keywords", stringListToArray(keywords))
         .putString("author", author)
-        .putNumber("timeRegistered", timeRegistered)
-        .putNumber("timeApproved", timeApproved)
-        .putBoolean("approved", approved)
 
       // Optional fields
       contributors.map { contribs => js.putArray("contributors", stringListToArray(contribs)) }
       repository.map { repo => js.putString("repository", repo) }
 
       js
+    }
+
+    def toWaitForApprovalEmailString(): String = {
+      s"""There is a new module waiting for approval in the module registry.
+
+   - Name: ${name}
+   - Description: ${description}
+   - License: ${license}
+   - ProjectUrl: ${projectUrl}
+   - Keywords: ${keywords}
+   - Author: ${author}
+   - Time registered: ${timeRegistered}
+
+Please approve this module soon! :)
+
+Thanks!"""
     }
   }
 

@@ -23,8 +23,8 @@ function getLiFromMods(modules) {
       time = item.timeRegistered;
     }
     items += '<li class="mod" id="' + item._id + '"><div class="modname"><span class="date">'
-        + formatTimestamp(time) + '</span> - <a href="' + item.downloadUrl + '">'
-        + item.name +'</a>' + additional + '</div></li>';
+        + formatTimestamp(time) + '</span> - <a href="' + item.downloadUrl + '">' + item.name
+        + '</a>' + additional + '</div></li>';
   }
   items += '</ul>';
   return items;
@@ -39,7 +39,7 @@ function formatTimestamp(time) {
   }
 
   var date = new Date(time);
-  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var months = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
   var year = date.getFullYear();
   var month = months[date.getMonth()];
   var day = date.getDate();
@@ -58,7 +58,7 @@ function createSearchFormSubmitHandler() {
     $('#searchButton').attr('disabled', true);
     $('#searchButton').text('Searching ...');
     $.post('/search', {
-      query: $('#query').val()
+      query : $('#query').val()
     }, function(data) {
       $('#searchButton').attr('disabled', false);
       $('#searchButton').text('Search');
@@ -96,21 +96,25 @@ function createRegisterFormHandler() {
   function showInfoMessage(message) {
     $('#register .error').hide();
     $('#register .info').show();
-    $('#register .info .message').text(message);
+    $('#register .info .message').html(message);
   }
 
   function showErrorMessage(message) {
     $('#register .info').hide();
     $('#register .error').show();
-    $('#register .error .message').text(message);
+    $('#register .error .message').html(message);
   }
 
   function processRegisterResult(json) {
     $('#registerButton').attr('disabled', false);
     $('#registerButton').text('Submit for moderation');
-    if (json.status == 'ok') {
-      showInfoMessage(JSON.stringify(json.data));
-    } else if (json.status == 'error') {
+    if (json.status === 'ok') {
+      showInfoMessage('<p>Saved module: '
+          + JSON.stringify(json.data)
+          + '</p>'
+          + ((json.mailSent) ? '<p>The moderators have been notified!</p>'
+              : '<p>Could not notify moderators, please notify them through IRC or on the mailing list to get your module approved quickly.</p>'));
+    } else if (json.status === 'error') {
       showErrorMessage(json.message);
     }
   }
@@ -123,7 +127,7 @@ function createRegisterFormHandler() {
     $('#registerButton').attr('disabled', true);
     $('#registerButton').text('Checking validity of module...');
     $.post('/register', {
-      downloadUrl: $('#registerFormDownloadUrl').val()
+      downloadUrl : $('#registerFormDownloadUrl').val()
     }, processRegisterResult, 'json');
   });
 }
@@ -160,8 +164,8 @@ function createUnapprovedModsHandler() {
     var margLeft = $(loginContainer).width() / 2;
 
     $(loginContainer).css({
-      'margin-top': -margTop,
-      'margin-left': -margLeft
+      'margin-top' : -margTop,
+      'margin-left' : -margLeft
     });
 
     // Add mask to hide the background
@@ -197,7 +201,7 @@ function createUnapprovedModsHandler() {
     $('#loginButton').attr('disabled', true);
     $('#loginButton').text('Logging in ...');
     $.post('/login', {
-      password: $('#password').val()
+      password : $('#password').val()
     }, processLoginResult, 'json');
   });
 
@@ -219,7 +223,7 @@ function createUnapprovedModsHandler() {
 
   function getUnapproved() {
     $.getJSON('/unapproved', {
-      sessionID: sid
+      sessionID : sid
     }, function(data) {
       if (data.modules) {
         $('#unapprovedModules').empty();
@@ -249,14 +253,14 @@ function createUnapprovedModsHandler() {
       var modId = $(mod).attr('id');
 
       $("#dialogConfirmApprove").dialog({
-        resizable: false,
-        modal: true,
-        buttons: {
-          "Yes, I'm sure!": function() {
+        resizable : false,
+        modal : true,
+        buttons : {
+          "Yes, I'm sure!" : function() {
             $(this).dialog("close");
             approve(modId);
           },
-          Cancel: function() {
+          Cancel : function() {
             $(this).dialog("close");
           }
         }
@@ -272,14 +276,14 @@ function createUnapprovedModsHandler() {
       var modId = $(mod).attr('id');
 
       $("#dialogConfirmDeny").dialog({
-        resizable: false,
-        modal: true,
-        buttons: {
-          "Yes, I'm sure!": function() {
+        resizable : false,
+        modal : true,
+        buttons : {
+          "Yes, I'm sure!" : function() {
             $(this).dialog("close");
             deny(modId);
           },
-          Cancel: function() {
+          Cancel : function() {
             $(this).dialog("close");
           }
         }
@@ -304,8 +308,8 @@ function createUnapprovedModsHandler() {
 
   function approve(modId) {
     $.post('/approve', {
-      sessionID: sid,
-      _id: modId
+      sessionID : sid,
+      _id : modId
     }, function(data) {
       processApproveResult(data)
     }, 'json');
@@ -337,22 +341,23 @@ function createUnapprovedModsHandler() {
     var messages = data.messages;
     if (messages.length > 0) {
       s = messages.pop();
-      while (messages.length)
+      while (messages.length) {
         s += '<br />' + messages.pop();
+      }
     }
     showLoginErrorMessage(s);
   }
 }
 
 function generateName() {
-  var nameA = ["awesome", "amazing", "fantastic", "marvelous", "storming", "staggering",
+  var nameA = [ "awesome", "amazing", "fantastic", "marvelous", "storming", "staggering",
       "exciting", "mind-blowing", "astonishing", "handsome", "beautiful", "admirable", "lovely",
       "gorgeous", "exceptional", "uncommon", "terribly nice", "outstanding", "fine-looking",
       "well-favored", "glorious", "pulchritudinous", "ravishing", "stunning", "dazzling",
-      "mind-boggling", "attractive", "graceful", "pleasing", "charismatic", "enchanting"];
-  var nameB = ["men", "guys", "dudes", "fellows", "jossers", "wallahs", "blokes", "fellas",
+      "mind-boggling", "attractive", "graceful", "pleasing", "charismatic", "enchanting" ];
+  var nameB = [ "men", "guys", "dudes", "fellows", "jossers", "wallahs", "blokes", "fellas",
       "fellers", "chaps", "lads", "people", "humans", "geezers", "boys", "gorillas", "bananas",
-      "champs", "rockers", "pals"];
+      "champs", "rockers", "pals" ];
   var a = Math.floor(Math.random() * nameA.length);
   var b = Math.floor(Math.random() * nameB.length);
   var name = nameA[a] + ' ' + nameB[b];
