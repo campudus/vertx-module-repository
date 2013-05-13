@@ -146,8 +146,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
           if (errors.isEmpty) {
             def callApprove() = {
               approve(vertx, id) onComplete {
-                case Success(json) =>
-                  req.response.end(json.encode())
+                case Success(json) => req.response.end(json.encode())
                 case Failure(error) => respondFailed(error.getMessage())
               }
             }

@@ -43,6 +43,7 @@ object Database extends VertxScalaHelpers {
     keywords: List[String],
     author: String,
     contributors: Option[List[String]] = None,
+    repository: Option[String],
     timeRegistered: Long,
     timeApproved: Long = -1,
     approved: Boolean = false,
@@ -63,6 +64,7 @@ object Database extends VertxScalaHelpers {
 
       // Optional fields
       contributors.map { contribs => js.putArray("contributors", stringListToArray(contribs)) }
+      repository.map { repo => js.putString("repository", repo) }
 
       js
     }
@@ -78,16 +80,33 @@ object Database extends VertxScalaHelpers {
       val keywords = jsonArrayToStringList(obj.getArray("keywords"))
       val author = obj.getString("author")
       val contributors = Option(obj.getArray("contributors")) map jsonArrayToStringList
+      val repository = Option(obj.getString("repository"))
 
-      Module(downloadUrl, name, description, license, projectUrl, keywords, author, contributors, System.currentTimeMillis())
+      Module(downloadUrl, name, description, license, projectUrl, keywords, author, contributors, repository, System.currentTimeMillis())
     }
 
-    def fromMongoJson(obj: JsonObject): Module = fromModJson(obj).get
+    def fromMongoJson(obj: JsonObject): Module = {
+      val downloadUrl = obj.getString("downloadUrl")
+      val name = obj.getString("name")
+      val description = obj.getString("description")
+      val license = obj.getString("license")
+      val projectUrl = obj.getString("projectUrl")
+      val keywords = jsonArrayToStringList(obj.getArray("keywords"))
+      val author = obj.getString("author")
+      val contributors = Option(obj.getArray("contributors")) map jsonArrayToStringList
+      val repository = Option(obj.getString("repository"))
+      val timeRegistered = obj.getLong("timeRegistered")
+      val timeApproved = obj.getLong("timeApproved")
+      val approved = obj.getBoolean("approved")
+      val id = obj.getString("_id")
+
+      Module(downloadUrl, name, description, license, projectUrl, keywords, author, contributors, repository, timeRegistered, timeApproved, approved, id)
+    }
   }
 
   def searchModules(vertx: Vertx, search: String): Future[List[Module]] = {
     val searchRegexObj = json.putString("$regex", search)
-    val listOfFields = List("downloadUrl", "name", "description", "license", "projectUrl", "keywords", "author", "contributors")
+    val listOfFields = List("downloadUrl", "name", "description", "license", "projectUrl", "keywords", "author", "contributors", "repository")
     val arr = new JsonArray
     listOfFields map (json.putObject(_, searchRegexObj)) foreach (arr.addObject)
 
@@ -133,7 +152,6 @@ object Database extends VertxScalaHelpers {
           msg.body.getString("status") match {
             case "ok" =>
               import scala.collection.JavaConversions._
-              val it = msg.body.getArray("results").iterator()
               val modules = msg.body.getArray("results").map {
                 case m: JsonObject => Module.fromMongoJson(m)
               }
@@ -158,7 +176,6 @@ object Database extends VertxScalaHelpers {
           msg.body.getString("status") match {
             case "ok" =>
               import scala.collection.JavaConversions._
-              val it = msg.body.getArray("results").iterator()
               val modules = msg.body.getArray("results").map {
                 case m: JsonObject => Module.fromMongoJson(m)
               }

@@ -9,12 +9,22 @@ function fillLatestApprovedMods() {
 }
 
 function getLiFromMods(modules) {
-  var item, items = '<ul>';
+  var additional, item, items = '<ul>', time;
   while (modules.length) {
     item = modules.pop();
+    if (item.repository) {
+      additional = ' (<a href="' + item.repository + '">Repo</a>)';
+    } else {
+      additional = '';
+    }
+    if (item.timeApproved != -1) {
+      time = item.timeApproved;
+    } else {
+      time = item.timeRegistered;
+    }
     items += '<li class="mod" id="' + item._id + '"><div class="modname"><span class="date">'
-        + formatTimestamp(item.timeApproved) + '</span> - <a href="' + item.projectUrl + '">'
-        + item.owner + '~' + item.name + '~' + item.version + '</a></div></li>';
+        + formatTimestamp(time) + '</span> - <a href="' + item.downloadUrl + '">'
+        + item.name +'</a>' + additional + '</div></li>';
   }
   items += '</ul>';
   return items;
@@ -45,9 +55,13 @@ function formatTimestamp(time) {
 function createSearchFormSubmitHandler() {
   $('#searchForm').submit(function(event) {
     event.preventDefault();
+    $('#searchButton').attr('disabled', true);
+    $('#searchButton').text('Searching ...');
     $.post('/search', {
       query: $('#query').val()
     }, function(data) {
+      $('#searchButton').attr('disabled', false);
+      $('#searchButton').text('Search');
       $('#searchResults').empty();
       if ($.isEmptyObject(data.modules)) {
         $('#searchResults').append('<p>Sorry, I couldn\'t find anything :(</p>');
@@ -180,12 +194,17 @@ function createUnapprovedModsHandler() {
 
   $('#loginForm').submit(function(event) {
     event.preventDefault();
+    $('#loginButton').attr('disabled', true);
+    $('#loginButton').text('Logging in ...');
     $.post('/login', {
       password: $('#password').val()
     }, processLoginResult, 'json');
   });
 
   function processLoginResult(data) {
+    $('#loginButton').attr('disabled', false);
+    $('#loginButton').text('Login');
+
     if (data.status == 'ok' && data.sessionID) {
       sid = data.sessionID
       getUnapproved();
@@ -213,7 +232,7 @@ function createUnapprovedModsHandler() {
       } else {
         showLoginErrorMessage("Internal error");
       }
-    })
+    });
   }
 
   function appendButtons(container) {
