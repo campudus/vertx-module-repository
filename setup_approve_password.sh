@@ -9,4 +9,4 @@ fi
 
 source .openshift/vertx-module-registry.config
 
-mongo ${OPENSHIFT_MONGODB_DB_HOST}:${OPENSHIFT_MONGODB_DB_PORT}/${MONGO_DB_NAME} --eval "use ${MONGO_DB_NAME};db.users.update({username:'approver'},{username:'approver',password:'${1}'},{upsert:true});"
+mongo ${OPENSHIFT_MONGODB_DB_HOST}:${OPENSHIFT_MONGODB_DB_PORT}/${MONGO_DB_NAME} --eval "db.users.update({username:'approver'},{username:'approver',password:'${1}'},{upsert:true});"
