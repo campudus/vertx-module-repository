@@ -9,13 +9,13 @@
       "password":"<MONGO_PASS>"
    },
    "mailer":{
-      "host":<MAILER_HOST>,
+      "host":"<MAILER_HOST>",
       "port":<MAILER_HOST>,
       "ssl":true,
       "auth":true,
-      "username":<MAILER_USER>,
-      "password":<MAILER_PASS>,
-      "infoMail":<MAILER_MAIL>,
+      "username":"<MAILER_USER>",
+      "password":"<MAILER_PASS>",
+      "infoMail":"<MAILER_MAIL>",
       "moderators":<MODERATOR_MAILS>
    },
    "auth":{
