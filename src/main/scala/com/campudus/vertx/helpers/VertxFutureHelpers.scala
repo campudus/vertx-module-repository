@@ -29,12 +29,12 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
   }
 
   def open(name: String): Future[AsyncFile] = futurify[AsyncFile] { promise =>
-    println("opening file " + name)
+    logger.info("opening file " + name)
     getVertx().fileSystem().open(name, { ar: AsyncResult[AsyncFile] =>
-      println("result: " + ar.result())
       if (ar.succeeded) {
         promise.success(ar.result)
       } else {
+        logger.warn("could not open " + name + " - " + ar.cause())
         promise.failure(new ModuleRegistryException("Opening of file / directory '" + name + "' failed: " + ar.cause, ar.cause))
       }
     })
@@ -51,23 +51,20 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
 
     val client = getVertx().createHttpClient.setHost(host).setPort(port).setKeepAlive(true)
 
-    println("downloading " + uri + " from " + host + ":" + port)
+    logger.info("downloading " + uri + " from " + host + ":" + port)
     val request = client.get(uri, { resp: HttpClientResponse =>
       if (resp.statusCode() != 200) {
-        println("Not the right status code: " + resp.statusCode())
-        println("headers:")
-        println(resp.headers().entries())
+        logger.warn("Not the right status code: " + resp.statusCode() + " - headers: " + resp.headers().entries())
         client.close()
         promise.failure(new ModuleRegistryException("could not open " + uri + " on " + host + ":" + port))
       } else {
         val buf = new Buffer(0)
 
         resp.dataHandler({ buffer: Buffer =>
-          println("writing data into file...")
           into.write(buffer)
         })
         resp.endHandler({ () =>
-          println("downloading done")
+          logger.info("downloading done")
           client.close()
           into.close()
           promise.success(into)
@@ -76,19 +73,19 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
     })
 
     client.exceptionHandler({ ex: Throwable =>
-      println("got an exception in client: " + ex)
+      logger.warn("got an exception in client: " + ex)
       promise.failure(new ModuleRegistryException("Download problem: " + ex, cause = ex))
     })
 
     request.putHeader("Host", host)
     request.putHeader("User-Agent", "Vert.x Module Registry")
 
-    println("request-headers: " + request.headers().entries())
+    logger.info("request-headers: " + request.headers().entries())
     request.end()
   }
 
   def extract(filename: String): Future[String] = futurify[String] { promise =>
-    println("extracting file " + filename)
+    logger.info("extracting file " + filename)
     getVertx().eventBus().send(ModuleRegistryStarter.unzipAddress,
       json.putString("zipFile", filename) /*.putBoolean("deleteZip", true)*/ ,
       { msg: Message[JsonObject] =>
@@ -102,11 +99,11 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
   }
 
   def modFileNameFromExtractedModule(dir: String): Future[String] = futurify[String] { promise =>
-    println("reading directory " + dir)
+    logger.info("reading directory " + dir)
     getVertx.fileSystem().readDir(dir, { ar: AsyncResult[Array[String]] =>
       if (ar.succeeded()) {
         val listOfEntries = ar.result.toList
-        println("read stuff from dir: " + listOfEntries)
+        logger.info("read stuff from dir: " + listOfEntries)
         listOfEntries.filter(_.endsWith("mod.json")).headOption match {
           case None => promise.failure(new ModuleRegistryException("Could not find mod.json in downloaded / extracted file"))
           case Some(modJson) => promise.success(modJson)
@@ -118,7 +115,7 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
   }
 
   def writeToFile(file: AsyncFile, buf: Buffer): Future[Unit] = futurify[Unit] { promise =>
-    println("writing into " + file)
+    logger.info("writing into " + file)
     file.write(buf, 0, { ar: AsyncResult[Void] =>
       if (ar.succeeded()) {
         promise.success(ar.result())
@@ -129,20 +126,19 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
   }
 
   def readFileToString(file: AsyncFile): Future[Buffer] = futurify[Buffer] { promise =>
-    println("reading file " + file)
+    logger.info("reading file " + file)
     file.exceptionHandler({ ex: Throwable =>
-      println("reading fail: " + ex.getMessage())
+      logger.warn("reading fail: " + ex.getMessage())
       ex.printStackTrace()
       promise.failure(new ModuleRegistryException("Reading of file failed: " + ex, ex))
     })
 
     val buffer = new Buffer(0)
     file.dataHandler({ buf: Buffer =>
-      println("data into buffer (read)...")
       buffer.appendBuffer(buf)
     })
     file.endHandler({ () =>
-      println("done reading " + file)
+      logger.info("done reading " + file)
       promise.success(buffer)
     })
   }
