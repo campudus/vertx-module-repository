@@ -10,9 +10,9 @@ You need to have mongo db installed and Vert.x 2.0.
 
 Before you can run the module registry, you need to create a user account. To do that, just create one with a simple query:
 
-    mongo localhost:27017/default_db --eval "db.users.update({username:'approver'},{username:'approver',password:'YOUR_PASSWORD_HERE'},{upsert:true});"
+    mongo localhost:27017/moduleregistry --eval "db.users.update({username:'approver'},{username:'approver',password:'YOUR_PASSWORD_HERE'},{upsert:true});"
 
-Just remember to change `localhost` to the host of your Mongo DB, `27017` is the port number and `default_db` is the name of your database. `YOUR_PASSWORD_HERE` should be changed to whatever password you want to have.
+Just remember to change `localhost` to the host of your Mongo DB, `27017` is the port number and `moduleregistry` is the name of your database. `YOUR_PASSWORD_HERE` should be changed to whatever password you want to have.
 
 When you created the user, you are good to go. Just start it with the following command:
 

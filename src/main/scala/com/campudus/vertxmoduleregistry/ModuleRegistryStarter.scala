@@ -18,15 +18,15 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
 
     logger.error("Starting module registry ...")
 
-    val config = Option(container.config()).getOrElse(new JsonObject)
-    val configDb = config.getObject("database", new JsonObject)
+    val config = Option(container.config()).getOrElse(json)
+    val configDb = config.getObject("database", json)
       .putString("address", Database.dbAddress)
-    val configMailer = config.getObject("mailer", new JsonObject)
+    val configMailer = config.getObject("mailer", json)
       .putString("address", mailerAddress)
-    val configAuth = config.getObject("auth", new JsonObject)
+    val configAuth = config.getObject("auth", json.putString("db_name", "moduleregistry"))
       .putString("persistor_address", Database.dbAddress)
       .putString("address", Authentication.authAddress)
-    val configUnzip = config.getObject("unzip", new JsonObject)
+    val configUnzip = config.getObject("unzip", json)
       .putString("address", unzipAddress)
 
     println("deploying all modules with " + config)
