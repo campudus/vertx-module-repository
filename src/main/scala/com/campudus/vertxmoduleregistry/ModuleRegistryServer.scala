@@ -46,7 +46,6 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
   }
 
   private def respondFailed(message: String)(implicit request: HttpServerRequest) = {
-    request.response().setStatusCode(400)
     request.response.end(s"""{"status":"error","message":"${message}"}""")
   }
 
@@ -60,14 +59,11 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     request.response.end(json.putString("status", "denied").encode())
 
   override def start() {
-    println("starting module registry")
+    logger.info("starting module registry")
     val rm = new RouteMatcher
 
     rm.get("/", { implicit req: HttpServerRequest =>
       deliver(webPath + FILE_SEP + "index.html")
-    })
-    rm.get("/register", { implicit req: HttpServerRequest =>
-      deliver(webPath + FILE_SEP + "register.html")
     })
 
     rm.get("/latest-approved-modules", {
@@ -188,14 +184,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     rm.post("/register", {
       implicit req: HttpServerRequest =>
         val buf = new Buffer(0)
-        println("post to /register")
+        logger.info("post to /register")
 
         req.dataHandler({ buffer: Buffer =>
-          println("data into buffer...")
+          logger.info("data into buffer...")
           buf.appendBuffer(buffer)
         })
         req.endHandler({ () =>
-          println("end handler of buffer!")
+          logger.info("end handler of buffer!")
 
           implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
           implicit val errorBuffer = collection.mutable.ListBuffer[String]()
@@ -216,7 +212,9 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
               }) onComplete {
                 case Success((module, json, sent)) =>
                   req.response.end(s"""{"status":"ok","mailSent":${sent},"data":${module.toSensibleJson.encode()}}""")
-                case Failure(error) => respondFailed(error.getMessage())
+                case Failure(error) =>
+                  logger.info("failed -> error response " + error.getMessage())
+                  respondFailed(error.getMessage())
               }
             } catch {
               case e: Exception =>
@@ -293,17 +291,17 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     val host = config.getString("host", "localhost")
     val port = config.getNumber("port", 8080)
 
-    println("host: " + host)
-    println("port: " + port)
-    println("this path: " + new File(".").getAbsolutePath())
-    println("webpath: " + webPath)
+    logger.info("host: " + host)
+    logger.info("port: " + port)
+    logger.info("this path: " + new File(".").getAbsolutePath())
+    logger.info("webpath: " + webPath)
 
     vertx.createHttpServer().requestHandler(rm).listen(port.intValue(), host);
-    println("started module registry server")
+    logger.info("started module registry server")
   }
 
   override def stop() {
-    println("stopped module registry server")
+    logger.info("stopped module registry server")
   }
 
   lazy val webPath = (new File(".")).getAbsolutePath() + FILE_SEP + "web"
@@ -314,7 +312,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
   private def deliver(file: String)(implicit request: HttpServerRequest): Unit = deliver(200, file)(request)
   private def deliver(statusCode: Int, file: String)(implicit request: HttpServerRequest) {
-    println("Delivering: " + file + " with code " + statusCode)
+    logger.info("Delivering: " + file + " with code " + statusCode)
     request.response.setStatusCode(statusCode).sendFile(file)
   }
 
@@ -339,24 +337,24 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
       modJson <- open(modFileName)
       content <- readFileToString(modJson)
     } yield {
-      println("got mod.json:\n" + content.toString())
+      logger.info("got mod.json:\n" + content.toString())
       val json = new JsonObject(content.toString()).putString("downloadUrl", uri.toString())
-      println("in json:\n" + json.encode())
+      logger.info("in json:\n" + json.encode())
       Module.fromModJson(json.putNumber("timeRegistered", System.currentTimeMillis())) match {
         case Some(module) => module
-        case None => throw new RuntimeException("cannot read module information from mod.json - fields missing?")
+        case None => throw new ModuleRegistryException("cannot read module information from mod.json - fields missing?")
       }
     }
   }
 
   private def sendMailToModerators(mod: Module): Future[Boolean] = {
-    println("in send mail")
+    logger.info("in send mail")
     val mailerConf = container.config().getObject("mailer", json)
-    println("mailerConf: " + mailerConf)
+    logger.info("mailerConf: " + mailerConf)
     val email = Option(mailerConf.getString("infoMail"))
-    println("email: " + email)
+    logger.info("email: " + email)
     val moderators = Option(mailerConf.getArray("moderators"))
-    println("moderators: " + moderators)
+    logger.info("moderators: " + moderators)
 
     if (email.isDefined && moderators.isDefined) {
       val data = json

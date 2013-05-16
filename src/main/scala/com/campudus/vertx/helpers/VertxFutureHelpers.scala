@@ -1,18 +1,20 @@
 package com.campudus.vertx.helpers
 
 import java.net.URI
-
 import scala.concurrent.{ Future, Promise }
-
 import org.vertx.java.core.AsyncResult
 import org.vertx.java.core.buffer.Buffer
 import org.vertx.java.core.eventbus.Message
 import org.vertx.java.core.file.AsyncFile
 import org.vertx.java.core.http.HttpClientResponse
 import org.vertx.java.core.json.JsonObject
-
 import com.campudus.vertx.Verticle
 import com.campudus.vertxmoduleregistry.ModuleRegistryStarter
+import com.campudus.vertxmoduleregistry.ModuleRegistryException
+import com.campudus.vertxmoduleregistry.ModuleRegistryException
+import com.campudus.vertxmoduleregistry.ModuleRegistryException
+import com.campudus.vertxmoduleregistry.ModuleRegistryException
+import com.campudus.vertxmoduleregistry.ModuleRegistryException
 
 trait VertxFutureHelpers extends VertxScalaHelpers {
   this: Verticle =>
@@ -33,7 +35,7 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
       if (ar.succeeded) {
         promise.success(ar.result)
       } else {
-        promise.failure(ar.cause)
+        promise.failure(new ModuleRegistryException("Opening of file / directory '" + name + "' failed: " + ar.cause, ar.cause))
       }
     })
   }
@@ -56,17 +58,13 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
         println("headers:")
         println(resp.headers().entries())
         client.close()
-        promise.failure(new RuntimeException("could not open " + uri + " on " + host + ":" + port))
+        promise.failure(new ModuleRegistryException("could not open " + uri + " on " + host + ":" + port))
       } else {
         val buf = new Buffer(0)
 
         resp.dataHandler({ buffer: Buffer =>
           println("writing data into file...")
           into.write(buffer)
-        })
-        resp.exceptionHandler({ ex: Throwable =>
-          println("exception while downloading: " + ex.getMessage())
-          promise.failure(ex)
         })
         resp.endHandler({ () =>
           println("downloading done")
@@ -75,6 +73,11 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
           promise.success(into)
         })
       }
+    })
+
+    client.exceptionHandler({ ex: Throwable =>
+      println("got an exception in client: " + ex)
+      promise.failure(new ModuleRegistryException("Download problem: " + ex, cause = ex))
     })
 
     request.putHeader("Host", host)
@@ -93,7 +96,7 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
           case "ok" =>
             promise.success(msg.body.getString("destDir"))
           case _ =>
-            promise.failure(new RuntimeException(msg.body.getString("message")))
+            promise.failure(new ModuleRegistryException(msg.body.getString("message")))
         }
       })
   }
@@ -104,9 +107,12 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
       if (ar.succeeded()) {
         val listOfEntries = ar.result.toList
         println("read stuff from dir: " + listOfEntries)
-        promise.success(listOfEntries.filter(_.endsWith("mod.json")).head)
+        listOfEntries.filter(_.endsWith("mod.json")).headOption match {
+          case None => promise.failure(new ModuleRegistryException("Could not find mod.json in downloaded / extracted file"))
+          case Some(modJson) => promise.success(modJson)
+        }
       } else {
-        promise.failure(new RuntimeException(ar.cause))
+        promise.failure(new ModuleRegistryException("Reading extracted module directory failed: " + ar.cause, ar.cause))
       }
     })
   }
@@ -117,7 +123,7 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
       if (ar.succeeded()) {
         promise.success(ar.result())
       } else {
-        promise.failure(ar.cause)
+        promise.failure(new ModuleRegistryException("Writing to file failed: " + ar.cause, ar.cause))
       }
     })
   }
@@ -127,7 +133,7 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
     file.exceptionHandler({ ex: Throwable =>
       println("reading fail: " + ex.getMessage())
       ex.printStackTrace()
-      promise.failure(ex)
+      promise.failure(new ModuleRegistryException("Reading of file failed: " + ex, ex))
     })
 
     val buffer = new Buffer(0)
