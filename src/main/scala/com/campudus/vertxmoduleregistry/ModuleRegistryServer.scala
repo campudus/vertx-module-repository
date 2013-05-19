@@ -204,7 +204,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
               val downloadUrl = new URI(url)
 
               (for {
-                module <- downloadExtractAndRegister(downloadUrl)
+                module <- downloadExtractAndRead(downloadUrl)
                 json <- registerModule(vertx, module)
                 sent <- sendMailToModerators(module)
               } yield {
@@ -324,7 +324,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     }
   }
 
-  private def downloadExtractAndRegister(uri: URI): Future[Module] = {
+  private def downloadExtractAndRead(uri: URI): Future[Module] = {
     val tempUUID = java.util.UUID.randomUUID()
     val tempFile = "module-" + tempUUID + ".tmp.zip"
     val absPath = new File(tempFile).getAbsolutePath()

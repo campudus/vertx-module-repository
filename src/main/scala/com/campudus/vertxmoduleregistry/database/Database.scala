@@ -229,6 +229,26 @@ Thanks!"""
 
   def registerModule(vertx: Vertx, module: Module): Future[JsonObject] = {
     val p = Promise[JsonObject]
+    vertx.eventBus.send(dbAddress, json
+      .putString("action", "find")
+      .putString("collection", "modules")
+      .putObject("matcher", json.putString("name", module.name)), {
+      findReply: Message[JsonObject] =>
+        if ("ok" == findReply.body.getString("status")) {
+          if (findReply.body.getArray("results").size() > 0) {
+            p.failure(new DatabaseException("Module is already registered."))
+          } else {
+            p.completeWith(saveModule(vertx, module))
+          }
+        } else {
+          p.failure(new DatabaseException(findReply.body.getString("message")))
+        }
+    })
+    p.future
+  }
+
+  private def saveModule(vertx: Vertx, module: Module): Future[JsonObject] = {
+    val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,
       json
         .putString("action", "save")
@@ -242,5 +262,4 @@ Thanks!"""
       })
     p.future
   }
-
 }
