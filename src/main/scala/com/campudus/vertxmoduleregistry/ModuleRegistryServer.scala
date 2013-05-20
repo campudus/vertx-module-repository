@@ -2,19 +2,21 @@ package com.campudus.vertxmoduleregistry
 
 import java.io.File
 import java.net.{ URI, URLDecoder }
+
 import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success }
+
 import org.vertx.java.core.{ AsyncResult, Vertx }
 import org.vertx.java.core.buffer.Buffer
+import org.vertx.java.core.eventbus.Message
 import org.vertx.java.core.file.FileProps
 import org.vertx.java.core.http.{ HttpServerRequest, RouteMatcher }
 import org.vertx.java.core.json.{ JsonArray, JsonObject }
+
 import com.campudus.vertx.Verticle
 import com.campudus.vertx.helpers.{ PostRequestReader, VertxFutureHelpers, VertxScalaHelpers }
-import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, registerModule, searchModules, unapproved }
+import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, registerModule, remove, searchModules, unapproved }
 import com.campudus.vertxmoduleregistry.security.Authentication.{ authorise, login, logout }
-import scala.util.Failure
-import org.vertx.java.core.eventbus.Message
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
   import com.campudus.vertx.DefaultVertxExecutionContext._
@@ -84,162 +86,183 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
         }
     })
 
-    rm.get("/unapproved", {
-      implicit req: HttpServerRequest =>
-        req.params().get("sessionID") match {
-          case s: String => {
-            def callUnapproved() = {
-              unapproved(vertx) onComplete {
-                case Success(modules) =>
-                  val modulesArray = new JsonArray()
-                  modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
-                  req.response.end(json.putArray("modules", modulesArray).encode)
-                case Failure(error) => respondFailed(error.getMessage())
-              }
-            }
-
-            isAuthorised(vertx, s) map {
-              case true => callUnapproved
-              case false => respondDenied
-            }
-          }
-          case _ => respondDenied
-        }
-
-    })
-
-    rm.post("/login", {
-      implicit req: HttpServerRequest =>
-        req.dataHandler({ buf: Buffer =>
-          implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
-          implicit val errorBuffer = collection.mutable.ListBuffer[String]()
-
-          val username = "approver"
-          val password = getRequiredParam("password", "Missing password")
-
-          val errors = errorBuffer.result
-          if (errors.isEmpty) {
-            login(vertx, username, password) onComplete {
-              case Success(sessionID) =>
-                req.response.end(json.putString("status", "ok").putString("sessionID", sessionID).encode)
-              case Failure(_) => respondDenied
-            }
-          } else {
-            respondErrors(errors)
-          }
-        })
-    })
-
-    rm.post("/approve", {
-      implicit req: HttpServerRequest =>
-        req.dataHandler({ buf: Buffer =>
-          implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
-          implicit val errorBuffer = collection.mutable.ListBuffer[String]()
-
-          val sessionID = getRequiredParam("sessionID", "Session ID required")
-          val id = getRequiredParam("_id", "Module ID required")
-
-          val errors = errorBuffer.result
-          if (errors.isEmpty) {
-            def callApprove() = {
-              approve(vertx, id) onComplete {
-                case Success(json) => req.response.end(json.encode())
-                case Failure(error) => respondFailed(error.getMessage())
-              }
-            }
-
-            isAuthorised(vertx, sessionID) map {
-              case true => callApprove
-              case false => respondDenied
-            }
-          } else {
-            respondErrors(errors)
-          }
-        })
-    })
-
-    rm.post("/search", {
-      implicit req: HttpServerRequest =>
-        req.dataHandler({ buf: Buffer =>
-          implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
-          implicit val errorBuffer = collection.mutable.ListBuffer[String]()
-
-          val query = getRequiredParam("query", "Cannot search with empty keywords")
-
-          val errors = errorBuffer.result
-          if (errors.isEmpty) {
-            searchModules(vertx, query) onComplete {
+    rm.get("/unapproved", { implicit req: HttpServerRequest =>
+      req.params().get("sessionID") match {
+        case s: String => {
+          def callUnapproved() = {
+            unapproved(vertx) onComplete {
               case Success(modules) =>
                 val modulesArray = new JsonArray()
                 modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
-                req.response.end(json.putString("status", "ok").putArray("modules", modulesArray).encode)
+                req.response.end(json.putArray("modules", modulesArray).encode)
               case Failure(error) => respondFailed(error.getMessage())
             }
-          } else {
-            respondErrors(errors)
           }
-        })
+
+          isAuthorised(vertx, s) map {
+            case true => callUnapproved
+            case false => respondDenied
+          }
+        }
+        case _ => respondDenied
+      }
+
     })
 
-    rm.post("/register", {
-      implicit req: HttpServerRequest =>
-        logger.info("post to /register")
+    rm.post("/login", { implicit req: HttpServerRequest =>
+      req.bodyHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
-        req.bodyHandler({ buf: Buffer =>
-          logger.info("end handler of buffer!")
+        val username = "approver"
+        val password = getRequiredParam("password", "Missing password")
 
-          implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
-          implicit val errorBuffer = collection.mutable.ListBuffer[String]()
-
-          val url = getRequiredParam("downloadUrl", "Download URL missing")
-
-          val errors = errorBuffer.result
-          if (errors.isEmpty) {
-            try {
-              val downloadUrl = new URI(url)
-
-              (for {
-                module <- downloadExtractAndRead(downloadUrl)
-                json <- registerModule(vertx, module)
-                sent <- sendMailToModerators(module)
-              } yield {
-                (module, json, sent)
-              }) onComplete {
-                case Success((module, json, sent)) =>
-                  req.response.end(s"""{"status":"ok","mailSent":${sent},"data":${module.toSensibleJson.encode()}}""")
-                case Failure(error) =>
-                  logger.info("failed -> error response " + error.getMessage())
-                  respondFailed(error.getMessage())
-              }
-            } catch {
-              case e: Exception =>
-                respondFailed("Download URL could not be parsed" + e.getMessage())
-            }
-          } else {
-            respondErrors(errors)
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          login(vertx, username, password) onComplete {
+            case Success(sessionID) =>
+              req.response.end(json.putString("status", "ok").putString("sessionID", sessionID).encode)
+            case Failure(_) => respondDenied
           }
-        })
+        } else {
+          respondErrors(errors)
+        }
+      })
     })
 
-    rm.post("/logout", {
-      implicit req: HttpServerRequest =>
-        req.dataHandler({ buf: Buffer =>
-          implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
-          implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+    rm.post("/approve", { implicit req: HttpServerRequest =>
+      req.bodyHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
-          val sessionID = getRequiredParam("sessionID", "Session ID required")
+        val sessionID = getRequiredParam("sessionID", "Session ID required")
+        val id = getRequiredParam("_id", "Module ID required")
 
-          val errors = errorBuffer.result
-          if (errors.isEmpty) {
-            logout(vertx, sessionID) onComplete {
-              case Success(oldSessionID) =>
-                req.response.end(json.putString("status", "ok").putString("sessionID", oldSessionID).encode)
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          def callApprove() = {
+            approve(vertx, id) onComplete {
+              case Success(json) => req.response.end(json.encode())
               case Failure(error) => respondFailed(error.getMessage())
             }
-          } else {
-            respondErrors(errors)
           }
-        })
+
+          isAuthorised(vertx, sessionID) map {
+            case true => callApprove
+            case false => respondDenied
+          }
+        } else {
+          respondErrors(errors)
+        }
+      })
+    })
+
+    rm.post("/remove", { implicit req: HttpServerRequest =>
+      req.bodyHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val sessionID = getRequiredParam("sessionID", "Session ID required")
+        val name = getRequiredParam("name", "Module ID required")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          def callRemove() = {
+            remove(vertx, name) onComplete {
+              case Success(json) => req.response.end(json.encode())
+              case Failure(error) => respondFailed(error.getMessage())
+            }
+          }
+
+          isAuthorised(vertx, sessionID) map {
+            case true => callRemove
+            case false => respondDenied
+          }
+        } else {
+          respondErrors(errors)
+        }
+      })
+    })
+
+    rm.post("/search", { implicit req: HttpServerRequest =>
+      req.bodyHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val query = getRequiredParam("query", "Cannot search with empty keywords")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          searchModules(vertx, query) onComplete {
+            case Success(modules) =>
+              val modulesArray = new JsonArray()
+              modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
+              req.response.end(json.putString("status", "ok").putArray("modules", modulesArray).encode)
+            case Failure(error) => respondFailed(error.getMessage())
+          }
+        } else {
+          respondErrors(errors)
+        }
+      })
+    })
+
+    rm.post("/register", { implicit req: HttpServerRequest =>
+      logger.info("post to /register")
+
+      req.bodyHandler({ buf: Buffer =>
+        logger.info("end handler of buffer!")
+
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val url = getRequiredParam("downloadUrl", "Download URL missing")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          try {
+            val downloadUrl = new URI(url)
+
+            (for {
+              module <- downloadExtractAndRead(downloadUrl)
+              json <- registerModule(vertx, module)
+              sent <- sendMailToModerators(module)
+            } yield {
+              (module, json, sent)
+            }) onComplete {
+              case Success((module, json, sent)) =>
+                req.response.end(s"""{"status":"ok","mailSent":${sent},"data":${module.toSensibleJson.encode()}}""")
+              case Failure(error) =>
+                logger.info("failed -> error response " + error.getMessage())
+                respondFailed(error.getMessage())
+            }
+          } catch {
+            case e: Exception =>
+              respondFailed("Download URL could not be parsed" + e.getMessage())
+          }
+        } else {
+          respondErrors(errors)
+        }
+      })
+    })
+
+    rm.post("/logout", { implicit req: HttpServerRequest =>
+      req.bodyHandler({ buf: Buffer =>
+        implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
+        implicit val errorBuffer = collection.mutable.ListBuffer[String]()
+
+        val sessionID = getRequiredParam("sessionID", "Session ID required")
+
+        val errors = errorBuffer.result
+        if (errors.isEmpty) {
+          logout(vertx, sessionID) onComplete {
+            case Success(oldSessionID) =>
+              req.response.end(json.putString("status", "ok").putString("sessionID", oldSessionID).encode)
+            case Failure(error) => respondFailed(error.getMessage())
+          }
+        } else {
+          respondErrors(errors)
+        }
+      })
     })
 
     rm.getWithRegEx("^(.*)$", { implicit req: HttpServerRequest =>
@@ -285,13 +308,25 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     val config = Option(container.config()).getOrElse(json)
     val host = config.getString("host", "localhost")
     val port = config.getNumber("port", 8080)
+    val ssl = config.getString("keystore-path") != null && config.getString("keystore-pass") != null
 
     logger.info("host: " + host)
     logger.info("port: " + port)
     logger.info("this path: " + new File(".").getAbsolutePath())
     logger.info("webpath: " + webPath)
 
-    vertx.createHttpServer().requestHandler(rm).listen(port.intValue(), host);
+    if (ssl) {
+      vertx.createHttpServer()
+        .requestHandler(rm)
+        .setSSL(true)
+        .setKeyStorePath(config.getString("keystore-path"))
+        .setKeyStorePassword(config.getString("keystore-pass"))
+        .listen(port.intValue(), host)
+    } else {
+      vertx.createHttpServer()
+        .requestHandler(rm)
+        .listen(port.intValue(), host)
+    }
 
     logger.info("started module registry server")
   }

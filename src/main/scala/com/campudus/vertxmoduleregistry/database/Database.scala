@@ -210,6 +210,41 @@ Thanks!"""
     p.future
   }
 
+  def remove(vertx: Vertx, id: String): Future[JsonObject] = {
+    val p = Promise[JsonObject]
+    vertx.eventBus.send(dbAddress,
+      json
+        .putString("action", "findone")
+        .putString("collection", "modules")
+        .putObject("matcher", json
+          .putString("name", id))
+        .putObject("keys", json.putBoolean("_id", true)),
+      { findMsg: Message[JsonObject] =>
+        if ("ok" == findMsg.body.getString("status")) {
+          Option(findMsg.body.getObject("result")) match {
+            case Some(obj) =>
+              val id = obj.getString("_id")
+              vertx.eventBus().send(dbAddress,
+                json
+                  .putString("action", "delete")
+                  .putString("collection", "modules")
+                  .putObject("matcher", json.putString("name", id)), {
+                  msg: Message[JsonObject] =>
+                    msg.body.getString("status") match {
+                      case "ok" => p.success(json.putString("status", "ok").putString("_id", id))
+                      case "error" => p.failure(new DatabaseException(msg.body.getString("message")))
+                    }
+                })
+            case None =>
+              p.failure(new DatabaseException("could not find module with name " + id))
+          }
+        } else {
+          p.failure(new DatabaseException(findMsg.body.getString("message")))
+        }
+      })
+    p.future
+  }
+
   def approve(vertx: Vertx, id: String): Future[JsonObject] = {
     val p = Promise[JsonObject]
     vertx.eventBus().send(dbAddress,

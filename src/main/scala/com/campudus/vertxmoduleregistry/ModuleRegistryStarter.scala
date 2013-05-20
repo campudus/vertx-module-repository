@@ -11,6 +11,7 @@ import org.vertx.java.core.Handler
 import com.campudus.vertx.Verticle
 import scala.concurrent.duration._
 import scala.concurrent.Await
+import org.vertx.java.core.eventbus.Message
 
 class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
   import ModuleRegistryStarter._
@@ -49,6 +50,27 @@ class ModuleRegistryStarter extends Verticle with VertxScalaHelpers {
       .map(id => println("deployed unzip module with id: " + id))
       .flatMap(_ => deployVerticle(serverVerticle, config))
       .map(id => println("deployed verticle with id: " + id))
+      .flatMap(_ => Option(config.getString("approver-password")) match {
+        case Some(pass) =>
+          logger.info("Resetting approver password!")
+          val p = Promise[Unit]
+          vertx.eventBus().send("registry.database", json
+            .putString("action", "update")
+            .putString("collection", "users")
+            .putBoolean("upsert", true)
+            .putObject("criteria", json.putString("username", "approver"))
+            .putObject("objNew", json
+              .putString("username", "approver")
+              .putString("password", pass)), { reply: Message[JsonObject] =>
+            if ("ok" == reply.body.getString("status")) {
+              p.success()
+            } else {
+              p.failure(new RuntimeException("could not reset password"))
+            }
+          })
+          p.future
+        case None => Future.successful()
+      })
 
     logger.info("Modules should deploy async now.")
 
