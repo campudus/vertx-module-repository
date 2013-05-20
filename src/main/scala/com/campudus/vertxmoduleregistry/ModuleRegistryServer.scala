@@ -2,21 +2,24 @@ package com.campudus.vertxmoduleregistry
 
 import java.io.File
 import java.net.{ URI, URLDecoder }
-
 import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success }
-
 import org.vertx.java.core.{ AsyncResult, Vertx }
 import org.vertx.java.core.buffer.Buffer
 import org.vertx.java.core.eventbus.Message
 import org.vertx.java.core.file.FileProps
 import org.vertx.java.core.http.{ HttpServerRequest, RouteMatcher }
 import org.vertx.java.core.json.{ JsonArray, JsonObject }
-
 import com.campudus.vertx.Verticle
 import com.campudus.vertx.helpers.{ PostRequestReader, VertxFutureHelpers, VertxScalaHelpers }
 import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, listModules, registerModule, remove, searchModules, unapproved }
 import com.campudus.vertxmoduleregistry.security.Authentication.{ authorise, login, logout }
+import org.vertx.java.core.file.AsyncFile
+import java.io.IOException
+import java.nio.file.Files
+import java.io.FileNotFoundException
+import org.vertx.java.core.file.FileSystemException
+import java.nio.file.NoSuchFileException
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
   import com.campudus.vertx.DefaultVertxExecutionContext._
@@ -369,12 +372,14 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
   private def downloadExtractAndRead(uri: URI): Future[Module] = {
     val tempUUID = java.util.UUID.randomUUID()
     val tempFile = "module-" + tempUUID + ".tmp.zip"
-    val absPath = new File(tempFile).getAbsolutePath()
+    val absPath = File.createTempFile("module-", tempUUID + ".tmp.zip").getAbsolutePath()
+    val tempDir = Files.createTempDirectory("vertx-" + tempUUID.toString())
+    val destDir = tempDir.toAbsolutePath().toString()
 
-    for {
+    val futureModule = for {
       file <- open(absPath)
       downloadedFile <- downloadInto(uri, file)
-      destDir <- extract(absPath)
+      _ <- extract(absPath, destDir)
       modFileName <- modFileNameFromExtractedModule(destDir)
       modJson <- open(modFileName)
       content <- readFileToString(modJson)
@@ -387,6 +392,33 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
         case None => throw new ModuleRegistryException("cannot read module information from mod.json - fields missing?")
       }
     }
+
+    futureModule andThen {
+      case _ =>
+        cleanUpFile(absPath) onFailure logCleanupFail(absPath)
+        cleanUpFile(destDir) onFailure logCleanupFail(destDir)
+    }
+  }
+
+  private def logCleanupFail(file: String): PartialFunction[Throwable, Unit] = {
+    case ex: FileSystemException =>
+      ex.getCause() match {
+        case ex: NoSuchFileException => // don't care
+        case _ => logger.error("Could not clean up file: " + file, ex)
+      }
+    case ex: Throwable => logger.error("Could not clean up file: " + file, ex)
+  }
+
+  private def cleanUpFile(file: String) = {
+    val p = Promise[Unit]
+    vertx.fileSystem().delete(file, true, { res: AsyncResult[Void] =>
+      if (res.succeeded()) {
+        p.success()
+      } else {
+        p.failure(res.cause)
+      }
+    })
+    p.future
   }
 
   private def sendMailToModerators(mod: Module): Future[Boolean] = {

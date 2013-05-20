@@ -17,9 +17,14 @@ import scala.util.Success
 import scala.util.Failure
 import org.vertx.java.core.eventbus.Message
 import scala.util.Try
+import java.nio.file.Files
+import java.nio.file.FileSystem
+import java.io.File
 
 class ModuleRegistryTester extends TestVerticle {
 
+  val TEMP_DIR = System.getProperty("java.io.tmpdir")
+  val FILE_SEP = File.separator
   val validDownloadUrl: String = "https://oss.sonatype.org/content/groups/public/com/campudus/session-manager/2.0.0-beta0/session-manager-2.0.0-beta0.zip"
   val incorrectDownloadUrl: String = "http://asdfreqw/"
   val approverPw: String = "password"
@@ -57,6 +62,16 @@ class ModuleRegistryTester extends TestVerticle {
         case Some("error") => testComplete()
         case _ => fail("should get an error reply, but got " + data.encode())
       }
+    }
+  }
+
+  @Test
+  def testCleanupAfterRegister() {
+    registerModule(validDownloadUrl) flatMap (_ => checkIfZipExists zip checkIfTmpDirExists) onComplete handleFailure {
+      case (true, true) => fail("Zip file and temp dir should not be there anymore")
+      case (true, false) => fail("Zip file dir should not be there anymore")
+      case (false, true) => fail("Temp dir should not be there anymore")
+      case (false, false) => testComplete()
     }
   }
 
@@ -171,7 +186,33 @@ class ModuleRegistryTester extends TestVerticle {
 
   private def handleFailure[T](doSth: T => Unit): Function1[Try[T], Any] = {
     case Success(x) => doSth(x)
-    case Failure(x) => fail("Should not get an exception but got " + x)
+    case Failure(x) =>
+      x.printStackTrace
+      fail("Should not get an exception but got " + x)
+  }
+
+  private def readDir(dir: String): Future[Array[String]] = {
+    val p = Promise[Array[String]]
+    vertx.fileSystem().readDir(dir, { res: AsyncResult[Array[String]] =>
+      if (res.succeeded()) {
+        p.success(res.result())
+      } else {
+        p.failure(new RuntimeException("could not read directory '" + dir + "'!"))
+      }
+    })
+    p.future
+  }
+
+  private def checkIfZipExists(): Future[Boolean] = {
+    readDir(TEMP_DIR) map { array =>
+      array.exists(element => (element.startsWith("module-") && element.endsWith(".zip")))
+    }
+  }
+
+  private def checkIfTmpDirExists(): Future[Boolean] = {
+    readDir(TEMP_DIR) map { array =>
+      array.exists(element => (element.startsWith(TEMP_DIR + FILE_SEP + "vertx-")))
+    }
   }
 
   private def deleteModule(modName: String) = {

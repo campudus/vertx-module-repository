@@ -84,10 +84,12 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
     request.end()
   }
 
-  def extract(filename: String): Future[String] = futurify[String] { promise =>
-    logger.info("extracting file " + filename)
+  def extract(filename: String, destDir: String): Future[String] = futurify[String] { promise =>
+    logger.info("extracting file " + filename + " into " + destDir)
     getVertx().eventBus().send(ModuleRegistryStarter.unzipAddress,
-      json.putString("zipFile", filename) /*.putBoolean("deleteZip", true)*/ ,
+      json.putString("zipFile", filename)
+        .putBoolean("deleteZip", true)
+        .putString("destDir", destDir),
       { msg: Message[JsonObject] =>
         msg.body.getString("status") match {
           case "ok" =>
