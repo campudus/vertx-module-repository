@@ -16,6 +16,7 @@ import com.campudus.vertx.TestVerticle
 import scala.util.Success
 import scala.util.Failure
 import org.vertx.java.core.eventbus.Message
+import scala.util.Try
 
 class ModuleRegistryTester extends TestVerticle {
 
@@ -41,23 +42,21 @@ class ModuleRegistryTester extends TestVerticle {
 
   @Test
   def testRegisterMod() {
-    registerModule(validDownloadUrl) onComplete {
-      case Success(data) => Option(data.getString("status")) match {
+    registerModule(validDownloadUrl) onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
         case Some("ok") => testComplete()
         case _ => fail("wrong status / error reply: " + data.encode())
       }
-      case Failure(ex) => fail("should not get exception, but got " + ex)
     }
   }
 
   @Test
   def testRegisterModTwice() {
-    registerModule(validDownloadUrl) flatMap (_ => registerModule(validDownloadUrl)) onComplete {
-      case Success(data) => Option(data.getString("status")) match {
+    registerModule(validDownloadUrl) flatMap (_ => registerModule(validDownloadUrl)) onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
         case Some("error") => testComplete()
         case _ => fail("should get an error reply, but got " + data.encode())
       }
-      case Failure(ex) => fail("Should get an error reply, not a failed future")
     }
   }
 
@@ -67,12 +66,11 @@ class ModuleRegistryTester extends TestVerticle {
       val modName = obj.getObject("data").getString("name")
       println("registered " + modName + ", now delete it" + obj.encode)
       deleteModule(modName)
-    } onComplete {
-      case Success(data) => Option(data.getString("status")) match {
+    } onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
         case Some("ok") => testComplete()
         case _ => fail("wrong status on delete! " + data.encode)
       }
-      case Failure(ex) => fail("Should not get an exception but got " + ex)
     }
   }
 
@@ -83,12 +81,11 @@ class ModuleRegistryTester extends TestVerticle {
       val client = vertx.createHttpClient().setHost("localhost").setPort(8080)
       noExceptionInClient(client)
       postJson(client, "/remove", "name" -> modId)
-    } onComplete {
-      case Success(data) => Option(data.getString("status")) match {
+    } onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
         case Some("error") => testComplete()
         case _ => fail("Should not be able to delete a module id twice")
       }
-      case Failure(ex) => fail("Should not get an exception but got " + ex)
     }
   }
 
@@ -97,24 +94,84 @@ class ModuleRegistryTester extends TestVerticle {
     registerModule(validDownloadUrl) flatMap { obj =>
       val modId = obj.getObject("data").getString("id")
       deleteModule(modId) flatMap (_ => deleteModule(modId))
-    } onComplete {
-      case Success(data) => Option(data.getString("status")) match {
+    } onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
         case Some("error") => testComplete()
         case _ => fail("Should not be able to delete a module id twice")
       }
-      case Failure(ex) => fail("Should not get an exception but got " + ex)
     }
   }
 
   @Test
   def testDeleteMissingModule() {
-    deleteModule("some-missing-id") onComplete {
-      case Success(data) => Option(data.getString("status")) match {
+    deleteModule("some-missing-id") onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
         case Some("error") => testComplete()
         case x => fail("Should not be able to delete a module that doesn't exist " + x)
       }
-      case Failure(ex) => fail("Should not get an exception but got " + ex)
     }
+  }
+
+  @Test
+  def testListAllModules() {
+    registerModule(validDownloadUrl) flatMap (_ => registerModule(validDownloadUrl)) flatMap { _ =>
+      val client = vertx.createHttpClient().setHost("localhost").setPort(8080)
+      noExceptionInClient(client)
+
+      getJson(client, "/list")
+    } onComplete handleFailure { obj =>
+      Option(obj.getArray("modules")) match {
+        case Some(results) => testComplete()
+        case None => fail("should get results but got none")
+      }
+    }
+  }
+
+  @Test
+  def testLogin() {
+    val client = vertx.createHttpClient().setHost("localhost").setPort(8080)
+    noExceptionInClient(client)
+
+    postJson(client, "/login", "password" -> approverPw) map { obj =>
+      assertNotNull("Should receive a working session id", obj.getString("sessionID"))
+      testComplete()
+    }
+  }
+
+  @Test
+  def testLogout() {
+    val client = vertx.createHttpClient().setHost("localhost").setPort(8080)
+    noExceptionInClient(client)
+
+    postJson(client, "/login", "password" -> approverPw) flatMap { obj =>
+      val sessionId = obj.getString("sessionID")
+      assertNotNull("Should receive a working session id", sessionId)
+      postJson(client, "/logout", "sessionID" -> sessionId)
+    } onComplete handleFailure { res =>
+      Option(res.getString("status")) match {
+        case Some("ok") => testComplete()
+        case _ => fail("got an error logging out!" + res.encode)
+      }
+    }
+  }
+
+  @Test
+  def testLogoutWithWrongSessionId() {
+    val client = vertx.createHttpClient().setHost("localhost").setPort(8080)
+    noExceptionInClient(client)
+
+    postJson(client, "/logout", "sessionID" -> "wrong-session-id") map { res =>
+      Option(res.getString("status")) match {
+        case Some("ok") => fail("Should not be able to logout with wrong session-id! " + res.encode)
+        case Some("error") => testComplete()
+        case _ => fail("Should get a status reply but got " + res.encode)
+      }
+    }
+  }
+
+  private def handleFailure[T](doSth: T => Unit): Function1[Try[T], Any] = {
+    case Success(x) => doSth(x)
+    case Failure(x) => fail("Should not get an exception but got " + x)
   }
 
   private def deleteModule(modName: String) = {
@@ -128,7 +185,7 @@ class ModuleRegistryTester extends TestVerticle {
     }
   }
 
-  private def registerModule(modUrl: String) = {
+  private def registerModule(modUrl: String): Future[JsonObject] = {
     val client = vertx.createHttpClient().setHost("localhost").setPort(8080)
     noExceptionInClient(client)
 
@@ -154,9 +211,9 @@ class ModuleRegistryTester extends TestVerticle {
     p.future
   }
 
-  private def getJson(client: HttpClient, url: String): Future[JsonObject] = {
+  private def getJson(client: HttpClient, url: String, params: (String, String)*): Future[JsonObject] = {
     val p = Promise[JsonObject]
-    val request = client.get(url, { resp: HttpClientResponse =>
+    val request = client.get(url + params.map { case (key, value) => key + "=" + value }.mkString("?", "&", ""), { resp: HttpClientResponse =>
       resp.bodyHandler({ buf: Buffer =>
         try {
           p.success(new JsonObject(buf.toString()))
@@ -165,6 +222,7 @@ class ModuleRegistryTester extends TestVerticle {
         }
       })
     })
+    request.end()
     p.future
   }
 

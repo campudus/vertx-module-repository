@@ -161,6 +161,34 @@ Thanks!"""
     p.future
   }
 
+  def listModules(vertx: Vertx, limit: Option[Int], skip: Option[Int]): Future[List[Module]] = {
+    val p = Promise[List[Module]]
+    val params = json
+      .putString("action", "find")
+      .putString("collection", "modules")
+      .putObject("sort", json.putNumber("name", 1))
+      .putObject("matcher", json.putBoolean("approved", true))
+
+    limit map (params.putNumber("limit", _))
+    skip map (params.putNumber("skip", _))
+
+    vertx.eventBus().send(dbAddress, params, {
+      msg: Message[JsonObject] =>
+        msg.body.getString("status") match {
+          case "ok" =>
+            import scala.collection.JavaConversions._
+            val modules = msg.body.getArray("results").map {
+              case m: JsonObject => Module.fromMongoJson(m)
+            }
+            p.success(modules.toList)
+
+          case "error" => p.failure(new DatabaseException(msg.body.getString("message")))
+        }
+    })
+
+    p.future
+  }
+
   def latestApprovedModules(vertx: Vertx, limit: Int): Future[List[Module]] = {
     val p = Promise[List[Module]]
     vertx.eventBus().send(dbAddress,

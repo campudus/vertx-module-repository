@@ -15,7 +15,7 @@ import org.vertx.java.core.json.{ JsonArray, JsonObject }
 
 import com.campudus.vertx.Verticle
 import com.campudus.vertx.helpers.{ PostRequestReader, VertxFutureHelpers, VertxScalaHelpers }
-import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, registerModule, remove, searchModules, unapproved }
+import com.campudus.vertxmoduleregistry.database.Database.{ Module, approve, latestApprovedModules, listModules, registerModule, remove, searchModules, unapproved }
 import com.campudus.vertxmoduleregistry.security.Authentication.{ authorise, login, logout }
 
 class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFutureHelpers {
@@ -79,6 +79,21 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
           case Success(modules) => /*
              {modules: [{...},{...}]}
              */
+            val modulesArray = new JsonArray()
+            modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
+            req.response.end(json.putArray("modules", modulesArray).encode)
+          case Failure(error) => respondFailed(error.getMessage())
+        }
+    })
+
+    rm.get("/list", {
+      implicit req: HttpServerRequest =>
+        val limit = Option(req.params().get("limit")) flatMap toInt
+        val skip = Option(req.params().get("skip")) flatMap toInt
+
+        listModules(vertx, limit, skip) onComplete {
+          case Success(modules) =>
+            println("got some modules: " + modules)
             val modulesArray = new JsonArray()
             modules.map(_.toJson).foreach(m => modulesArray.addObject(m))
             req.response.end(json.putArray("modules", modulesArray).encode)
@@ -207,11 +222,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     })
 
     rm.post("/register", { implicit req: HttpServerRequest =>
-      logger.info("post to /register")
-
       req.bodyHandler({ buf: Buffer =>
-        logger.info("end handler of buffer!")
-
         implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
         implicit val errorBuffer = collection.mutable.ListBuffer[String]()
 
