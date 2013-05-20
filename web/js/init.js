@@ -109,9 +109,9 @@ function createRegisterFormHandler() {
     $('#registerButton').attr('disabled', false);
     $('#registerButton').text('Submit for moderation');
     if (json.status === 'ok') {
-      showInfoMessage('<p>Saved module: '
-          + JSON.stringify(json.data)
-          + '</p>'
+      showInfoMessage('<p>Module \''
+          + json.data.name
+          + '\' submitted for moderation</p>'
           + ((json.mailSent) ? '<p>The moderators have been notified!</p>'
               : '<p>Could not notify moderators, please notify them through IRC or on the mailing list to get your module approved quickly.</p>'));
     } else if (json.status === 'error') {
