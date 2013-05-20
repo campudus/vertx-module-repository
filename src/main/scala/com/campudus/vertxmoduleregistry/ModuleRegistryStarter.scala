@@ -123,4 +123,6 @@ object ModuleRegistryStarter {
   val unzipModName = "io.vertx~mod-unzip~1.0.0-SNAPSHOT"
   val unzipAddress = "io.vertx.unzipper"
   val serverVerticle = "com.campudus.vertxmoduleregistry.ModuleRegistryServer"
+
+  var standardDownloadTimeout: Long = 20000
 }

@@ -15,6 +15,7 @@ import com.campudus.vertxmoduleregistry.ModuleRegistryException
 import com.campudus.vertxmoduleregistry.ModuleRegistryException
 import com.campudus.vertxmoduleregistry.ModuleRegistryException
 import com.campudus.vertxmoduleregistry.ModuleRegistryException
+import com.campudus.vertxmoduleregistry.ModuleRegistryException
 
 trait VertxFutureHelpers extends VertxScalaHelpers {
   this: Verticle =>
@@ -59,9 +60,17 @@ trait VertxFutureHelpers extends VertxScalaHelpers {
         promise.failure(new ModuleRegistryException("could not open " + uri + " on " + host + ":" + port))
       } else {
         val buf = new Buffer(0)
+        val startedAt = System.currentTimeMillis()
 
         resp.dataHandler({ buffer: Buffer =>
           into.write(buffer)
+          val tookTime = System.currentTimeMillis() - startedAt
+          logger.info("download-time: " + tookTime)
+          if (tookTime > getContainer().config().getLong("download-timeout", ModuleRegistryStarter.standardDownloadTimeout)) {
+            client.close()
+            into.close()
+            promise.failure(new ModuleRegistryException("Timed out downloading module! The module is probably too large to download."))
+          }
         })
         resp.endHandler({ () =>
           logger.info("downloading done")

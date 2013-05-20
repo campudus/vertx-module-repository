@@ -20,6 +20,7 @@ import scala.util.Try
 import java.nio.file.Files
 import java.nio.file.FileSystem
 import java.io.File
+import com.campudus.vertxmoduleregistry.ModuleRegistryStarter
 
 class ModuleRegistryTester extends TestVerticle {
 
@@ -61,6 +62,23 @@ class ModuleRegistryTester extends TestVerticle {
       Option(data.getString("status")) match {
         case Some("error") => testComplete()
         case _ => fail("should get an error reply, but got " + data.encode())
+      }
+    }
+  }
+
+  @Test
+  def testDownloadingTimeout() {
+    val oldTimeout = ModuleRegistryStarter.standardDownloadTimeout
+
+    ModuleRegistryStarter.standardDownloadTimeout = 10
+    registerModule(validDownloadUrl) onComplete handleFailure { data =>
+      Option(data.getString("status")) match {
+        case Some("error") =>
+          ModuleRegistryStarter.standardDownloadTimeout = oldTimeout
+          testComplete()
+        case _ =>
+          ModuleRegistryStarter.standardDownloadTimeout = oldTimeout
+          fail("should get an error reply, but got " + data.encode())
       }
     }
   }
