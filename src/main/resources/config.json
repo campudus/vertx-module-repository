@@ -1,6 +1,9 @@
 {
    "host":"<HOST>",
    "port":<PORT>,
+   "keystore-path":<KEYSTORE_PATH>,
+   "keystore-pass":<KEYSTORE_PASS>,
+   "download-timeout":20000,
    "database":{
       "host":"<MONGO_HOST>",
       "port":<MONGO_PORT>,

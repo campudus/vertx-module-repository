@@ -37,6 +37,7 @@ There are a few configuration options available and a template for it can be fou
     {
       "host":"localhost",
       "port":8080,
+      "download-timeout":20000,
       "database":{
         "host":"localhost",
         "port":27017,
@@ -59,3 +60,17 @@ There are a few configuration options available and a template for it can be fou
         "session_timeout": 1800000
       }
     }
+
+A short description about each field:
+* `host` The host where the server should listen on. Defaults to `localhost`.
+* `port` The port where the server should listen on. Defaults to `8080`.
+* `download-timeout` The timeout in milliseconds, how long the module registry downloads modules. Defaults to `20000`.
+* `keystore-path` The path to your Java keystore. This field is mandatory if you want to use SSL.
+* `keystore-pass` The password for your Java keystore. This field is mandatory if you want to use SSL.
+* `database` Configuration for the mongo-persistor. See the [mod-mongo-persistor repository](https://github.com/vert-x/mod-mongo-persistor) about which configuration options are available.
+* `mailer` The configuration for the mailer. See the [mod-mailer repository() for more information on the regular options.
+    * `infoMail` The address the module registry sends emails from. Defaults to `modules@vertx.io`
+    * `moderators` A list of email addresses which should be notified when a new module was registered and is waiting for approval.
+* `auth` Where to look for the credentials.
+    * `user_collection` The collection where to look for the approver password. Defaults to `users`.
+    * `session_timeout` The usual auth timeout in milliseconds. Defaults to `1800000`.
