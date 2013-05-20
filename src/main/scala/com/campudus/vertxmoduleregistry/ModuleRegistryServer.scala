@@ -183,14 +183,9 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
 
     rm.post("/register", {
       implicit req: HttpServerRequest =>
-        val buf = new Buffer(0)
         logger.info("post to /register")
 
-        req.dataHandler({ buffer: Buffer =>
-          logger.info("data into buffer...")
-          buf.appendBuffer(buffer)
-        })
-        req.endHandler({ () =>
+        req.bodyHandler({ buf: Buffer =>
           logger.info("end handler of buffer!")
 
           implicit val paramMap = PostRequestReader.dataToMap(buf.toString)
@@ -297,6 +292,7 @@ class ModuleRegistryServer extends Verticle with VertxScalaHelpers with VertxFut
     logger.info("webpath: " + webPath)
 
     vertx.createHttpServer().requestHandler(rm).listen(port.intValue(), host);
+
     logger.info("started module registry server")
   }
 
